@@ -100,6 +100,8 @@ data-intelligence/
 
 ## Getting Started
 
+> **Important:** Before you start working, read the [Contributing Guidelines](CONTRIBUTING.md).
+
 ### Prerequisites
 - Docker + Docker Compose
 - Python 3.11+
