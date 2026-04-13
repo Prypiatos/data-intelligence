@@ -106,7 +106,7 @@ data-intelligence/
 
 ### Setup
 ```bash
-git clone https://github.com/<org>/data-intelligence.git
+git clone https://github.com/Prypiatos/data-intelligence.git
 cd data-intelligence
 cp .env.example .env
 docker-compose up -d
