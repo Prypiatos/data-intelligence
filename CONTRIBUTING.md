@@ -107,4 +107,4 @@ wip
 ---
 
 ## Shared files
-`requirements.txt`, `pyproject.toml`, `.env.example` — give a heads up in the group chat before editing these to avoid conflicts
+`requirements.txt`, `pyproject.toml`, `.env.example` - Be mindful not to overwrite others' work when editing these common files.
