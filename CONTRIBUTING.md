@@ -2,7 +2,7 @@
 
 ## Team
 
-**Tharupahan Jayawardana** — Architecture, Scrum, Anomaly Detection
+**Tharupahan Jayawardana** - Architecture, Scrum, Anomaly Detection
 - `src/models/anomaly/`
 - `src/optimization/`
 - `src/utils/`
@@ -11,7 +11,7 @@
 - `tests/unit/test-anomaly.py`
 - `tests/system/test-end-to-end-pipeline.py`
 
-**[Name]** — Ingestion & Storage
+**[Name]** - Ingestion & Storage
 - `src/ingestion/`
 - `db/postgres/`
 - `db/influxdb/`
@@ -22,7 +22,7 @@
 - `tests/integration/test-db-connections.py`
 - `tests/integration/test-kafka-pipeline.py`
 
-**[Name]** — Forecasting & ML Ops
+**[Name]** - Forecasting & ML Ops
 - `src/models/forecasting/`
 - `mlflow/`
 - `src/spark/feature-engineering.py`
@@ -30,7 +30,7 @@
 - `docker/Dockerfile.forecasting`
 - `tests/unit/test-forecasting.py`
 
-**[Name]** — Stream Processing & Validation
+**[Name]** - Stream Processing & Validation
 - `src/streaming/`
 - `src/validation/`
 - `src/spark/batch-energy-analytics.py`
@@ -39,7 +39,7 @@
 - `tests/unit/test-streaming.py`
 - `tests/unit/test-validation.py`
 
-**[Name]** — API & Infrastructure
+**[Name]** - API & Infrastructure
 - `src/api/`
 - `docker-compose.yml`
 - `docker/Dockerfile.api`
@@ -70,6 +70,12 @@ Each member has their own branch. Work there, don't push to other branches.
 ---
 
 ## Before you start working
+After cloning, run this once to activate commit hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 Always pull the latest from main into your branch before starting anything new. This keeps conflicts small and manageable.
 
 ```bash
@@ -100,8 +106,8 @@ wip
 
 ## Raising a PR
 - Check branch is up to date with `main` first
-- Fill in the PR template — [Find it here](.github/PULL_REQUEST_TEMPLATE.md)
-- Tag the issue in PR description like this — `Closes #12`
+- Fill in the PR template - [Find it here](.github/PULL_REQUEST_TEMPLATE.md)
+- Tag the issue in PR description like this - `Closes #12`
 - Don't merge your own PR
 
 ---

@@ -1,0 +1,6 @@
+#!/bin/sh
+commit_msg=$(cat "$1")
+if echo "$commit_msg" | grep -iE "claude|cursor|copilot|chatgpt|openai|anthropic|co-authored-by.*(claude|cursor|copilot|chatgpt)" > /dev/null; then
+  echo "Error: Commit message references an AI agent. Remove it before committing."
+  exit 1
+fi
