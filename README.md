@@ -1,5 +1,4 @@
-# Group E: Energy Management System
-> Subgroup E2 | Data Engineering + AI/ML
+# Subgroup E2 : Data Engineering + AI/ML
 
 ---
 
