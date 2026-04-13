@@ -1,4 +1,4 @@
-# Contributing
+# Contributing Guidelines
 
 ## Branches
 Each member has their own branch. Work there, don't push to other branches.
