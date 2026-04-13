@@ -1,0 +1,9 @@
+# MLflow tracking server configuration
+# Experiment tracking, model registry, and artifact storage
+
+tracking_uri: http://mlflow:5000
+artifact_location: s3://mlflow-artifacts  # or local path for dev
+
+experiments:
+  - name: load-forecasting
+  - name: anomaly-detection
