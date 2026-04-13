@@ -22,7 +22,7 @@
 - `tests/integration/test-db-connections.py`
 - `tests/integration/test-kafka-pipeline.py`
 
-**[Name]** - Forecasting & ML Ops
+**Didula Jeewandara** - Forecasting & ML Ops
 - `src/models/forecasting/`
 - `mlflow/`
 - `src/spark/feature-engineering.py`
