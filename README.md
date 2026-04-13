@@ -174,7 +174,7 @@ pytest tests/ -v
 - **Sprint 1:** Each member develops against mock data to avoid blocking dependencies
 - **Sprint 2+:** Integration with live Kafka/InfluxDB pipelines begins
 - Docker only handles local development. Production orchestration is managed by E4
-- `pyproject.toml`, `requirements.txt`, and `.env.example` are shared — everyone updates them as needed. Tharupahan resolves conflicts and maintains consistency.
+- `pyproject.toml`, `requirements.txt`, and `.env.example` are shared. Everyone updates them as needed.
 
 ---
 
