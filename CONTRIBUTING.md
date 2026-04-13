@@ -11,6 +11,16 @@ Each member has their own branch. Work there, don't push to other branches.
 | `stream-processing` | [Name] |
 | `analytics-api` | [Name] |
 
+## Before you start working
+Always pull the latest from main into your branch before starting anything new. This keeps conflicts small and manageable.
+
+```bash
+git checkout your-branch
+git pull origin main
+```
+
+If you haven't touched your branch in a while, do this before writing a single line.
+
 ## Commits
 Keep them small and focused. One thing per commit.
 
