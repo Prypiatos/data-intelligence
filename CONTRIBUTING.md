@@ -62,10 +62,10 @@ Each member has their own branch. Work there, don't push to other branches.
 | Branch | Owner |
 |---|---|
 | `anomaly-detection` | Tharupahan |
-| `data-ingestion` | [Jitharsanan] |
-| `load-forecasting` | [Didula] |
-| `stream-processing` | [Kajatheepan] |
-| `analytics-api` | [Babijana] |
+| `data-ingestion` | Jitharsanan |
+| `load-forecasting` | Didula |
+| `stream-processing` | Kajatheepan |
+| `analytics-api` | Babijana |
 
 ---
 
