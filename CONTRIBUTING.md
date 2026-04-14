@@ -39,7 +39,7 @@
 - `tests/unit/test-streaming.py`
 - `tests/unit/test-validation.py`
 
-**[Name]** - API & Infrastructure
+**babijana jegarashan** - API & Infrastructure
 - `src/api/`
 - `docker-compose.yml`
 - `docker/Dockerfile.api`
