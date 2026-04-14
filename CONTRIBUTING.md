@@ -30,7 +30,7 @@
 - `docker/Dockerfile.forecasting`
 - `tests/unit/test-forecasting.py`
 
-**[Name]** - Stream Processing & Validation
+**Kajatheepan Perinpanathan** - Stream Processing & Validation
 - `src/streaming/`
 - `src/validation/`
 - `src/spark/batch-energy-analytics.py`
