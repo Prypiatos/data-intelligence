@@ -11,7 +11,7 @@
 - `tests/unit/test-anomaly.py`
 - `tests/system/test-end-to-end-pipeline.py`
 
-**[Name]** - Ingestion & Storage
+**Jitharsanan Thiruketheeswaran** - Ingestion & Storage
 - `src/ingestion/`
 - `db/postgres/`
 - `db/influxdb/`
