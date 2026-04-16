@@ -39,3 +39,17 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: energy-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin12345
+      DOCKER_INFLUXDB_INIT_ORG: energy-org
+      DOCKER_INFLUXDB_INIT_BUCKET: energy_data
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: energy-token-123
+    restart: unless-stopped

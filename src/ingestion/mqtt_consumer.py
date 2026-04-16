@@ -3,6 +3,7 @@ import paho.mqtt.client as mqtt
 from kafka_producer import publish_telemetry
 from validator import validate_telemetry
 from db_writer import insert_telemetry
+from influx_writer import write_telemetry
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -26,6 +27,7 @@ def on_message(client, userdata, msg):
 
         publish_telemetry(data)
         insert_telemetry(data)
+        write_telemetry(data)
 
     except Exception as error:
         print("Error processing MQTT message:", error)
