@@ -1,5 +1,6 @@
 import json
 import paho.mqtt.client as mqtt
+from kafka_producer import publish_telemetry
 from validator import validate_telemetry
 
 
@@ -21,6 +22,8 @@ def on_message(client, userdata, msg):
 
         print("Topic:", msg.topic)
         print("Valid telemetry message:", data)
+
+        publish_telemetry(data)
 
     except Exception as error:
         print("Error processing MQTT message:", error)
