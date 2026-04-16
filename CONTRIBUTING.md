@@ -11,7 +11,7 @@
 - `tests/unit/test-anomaly.py`
 - `tests/system/test-end-to-end-pipeline.py`
 
-**[Name]** - Ingestion & Storage
+**Jitharsanan Thiruketheeswaran** - Ingestion & Storage
 - `src/ingestion/`
 - `db/postgres/`
 - `db/influxdb/`
@@ -30,7 +30,7 @@
 - `docker/Dockerfile.forecasting`
 - `tests/unit/test-forecasting.py`
 
-**[Name]** - Stream Processing & Validation
+**Kajatheepan Perinpanathan** - Stream Processing & Validation
 - `src/streaming/`
 - `src/validation/`
 - `src/spark/batch-energy-analytics.py`
@@ -39,7 +39,7 @@
 - `tests/unit/test-streaming.py`
 - `tests/unit/test-validation.py`
 
-**[Name]** - API & Infrastructure
+**babijana jegarashan** - API & Infrastructure
 - `src/api/`
 - `docker-compose.yml`
 - `docker/Dockerfile.api`
@@ -62,10 +62,10 @@ Each member has their own branch. Work there, don't push to other branches.
 | Branch | Owner |
 |---|---|
 | `anomaly-detection` | Tharupahan |
-| `data-ingestion` | [Name] |
-| `load-forecasting` | [Name] |
-| `stream-processing` | [Name] |
-| `analytics-api` | [Name] |
+| `data-ingestion` | Jitharsanan |
+| `load-forecasting` | Didula |
+| `stream-processing` | Kajatheepan |
+| `analytics-api` | Babijana |
 
 ---
 
