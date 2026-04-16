@@ -20,77 +20,10 @@ E2 is responsible for the data and intelligence layer of the Energy Management S
 
 # System Architecture
 
-```mermaid
-flowchart TD
-    %% External Edge Layer (E1)
-    subgraph E1[E1: Edge Layer]
-        SM[Smart Meters] -- MQTT --> MB[MQTT Broker]
-    end
+---
 
-    %% Data Intelligence Layer (E2)
-    subgraph E2[E2: Data Intelligence Layer]
-        
-        %% Ingestion
-        subgraph Ingestion[Data Ingestion]
-            MB -- Subscribe --> MC[MQTT Consumer]
-            MC -- Validate --> Val[Great Expectations]
-            Val -- Clean Data --> KP[Kafka Producer]
-        end
+![Architecture Diagram](./architecture.png)
 
-        %% Event Bus
-        KP -- "energy.telemetry" --> Kafka{Apache Kafka}
-        
-        %% Storage
-        subgraph Storage[Data Storage]
-            KP -- Write --> PG[(PostgreSQL)]
-            KP -- Write --> IF[(InfluxDB)]
-        end
-
-        %% Processing
-        subgraph Processing[Data Processing]
-            Kafka -- Real-time --> Flink[Apache Flink]
-            PG -. Batch .-> Spark[Apache Spark / Airflow]
-            IF -. Batch .-> Spark
-            Flink -- "clean-telemetry" --> Kafka
-        end
-
-        %% AI/ML Models
-        subgraph ML[AI / ML Models]
-            Kafka -- Consume --> AD[Anomaly Detection]
-            Kafka -- Consume --> LF[Load Forecasting]
-            Spark -- Features --> AD
-            Spark -- Features --> LF
-            
-            AD -- "energy_anomalies" --> Kafka
-            LF -- "energy_forecasts" --> Kafka
-        end
-
-        %% API & Serving
-        subgraph Serving[API Layer]
-            PG -. Query .-> API[FastAPI Server]
-            IF -. Query .-> API
-            Kafka -- Consume --> API
-            API <--> Redis[(Redis Cache)]
-        end
-    end
-
-    %% External Consumers (E3 & E4)
-    subgraph Consumers[Downstream Systems]
-        API -- REST --> E3[E3: System Engineering UI/Dashboards]
-        API -- REST --> E4[E4: Platform & Security]
-        Kafka -- Topics --> E4
-    end
-
-    %% Styling
-    classDef default fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
-    classDef storage fill:#064e3b,stroke:#047857,color:#d1fae5;
-    classDef broker fill:#78350f,stroke:#b45309,color:#fef3c7;
-    classDef api fill:#831843,stroke:#be185d,color:#fce7f3;
-    
-    class Kafka broker;
-    class PG,IF,Redis storage;
-    class API api;
-```
 ---
 
 ## Tech Stack
