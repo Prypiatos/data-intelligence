@@ -1,5 +1,12 @@
 def validate_telemetry(data):
-    required_fields = ["node_id", "timestamp", "voltage", "current", "power", "energy_wh"]
+    required_fields = [
+        "node_id",
+        "timestamp",
+        "voltage",
+        "current",
+        "power",
+        "energy_wh",
+    ]
 
     # Check required fields
     for field in required_fields:
