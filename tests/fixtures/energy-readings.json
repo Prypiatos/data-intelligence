@@ -2,150 +2,401 @@
   {
     "node_id": "plug_01",
     "timestamp": 1710000000000,
-    "voltage": 229.5,
-    "current": 1.45,
-    "power": 332.0,
-    "energy_wh": 1200.0
+    "voltage": 229.8,
+    "current": 1.2,
+    "power": 275.8,
+    "energy_wh": 1180.0
   },
   {
     "node_id": "plug_02",
     "timestamp": 1710000000000,
-    "voltage": 231.0,
-    "current": 0.85,
-    "power": 196.4,
-    "energy_wh": 800.0
+    "voltage": 231.4,
+    "current": 0.9,
+    "power": 208.3,
+    "energy_wh": 842.0
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000000000,
+    "voltage": 232.1,
+    "current": 4.1,
+    "power": 951.6,
+    "energy_wh": 4120.0
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000000000,
+    "voltage": 230.6,
+    "current": 3.5,
+    "power": 807.1,
+    "energy_wh": 3665.0
   },
   {
     "node_id": "main_01",
     "timestamp": 1710000000000,
-    "voltage": 228.8,
-    "current": 3.50,
-    "power": 801.0,
-    "energy_wh": 5000.0
+    "voltage": 233.0,
+    "current": 8.4,
+    "power": 1957.2,
+    "energy_wh": 9650.0
   },
-
   {
     "node_id": "plug_01",
-    "timestamp": 1710000002000,
+    "timestamp": 1710000060000,
     "voltage": 230.2,
-    "current": 1.60,
-    "power": 368.3,
-    "energy_wh": 1201.0
+    "current": 1.4,
+    "power": 322.3,
+    "energy_wh": 1185.4
   },
   {
     "node_id": "plug_02",
-    "timestamp": 1710000002000,
+    "timestamp": 1710000060000,
+    "voltage": 231.0,
+    "current": 1.1,
+    "power": 254.1,
+    "energy_wh": 846.2
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000060000,
+    "voltage": 232.4,
+    "current": 4.5,
+    "power": 1045.8,
+    "energy_wh": 4137.4
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000060000,
+    "voltage": 230.9,
+    "current": 3.9,
+    "power": 900.5,
+    "energy_wh": 3680.0
+  },
+  {
+    "node_id": "main_01",
+    "timestamp": 1710000060000,
+    "voltage": 232.6,
+    "current": 8.9,
+    "power": 2070.1,
+    "energy_wh": 9684.5
+  },
+  {
+    "node_id": "plug_01",
+    "timestamp": 1710000120000,
+    "voltage": 229.5,
+    "current": 1.0,
+    "power": 229.5,
+    "energy_wh": 1189.2
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000120000,
     "voltage": 230.7,
-    "current": 1.10,
-    "power": 253.7,
-    "energy_wh": 801.2
+    "current": 0.8,
+    "power": 184.6,
+    "energy_wh": 849.3
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000120000,
+    "voltage": 231.8,
+    "current": 3.8,
+    "power": 880.8,
+    "energy_wh": 4152.1
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000120000,
+    "voltage": 229.8,
+    "current": 3.2,
+    "power": 735.4,
+    "energy_wh": 3692.3
   },
   {
     "node_id": "main_01",
-    "timestamp": 1710000002000,
-    "voltage": 229.0,
-    "current": 3.80,
-    "power": 870.2,
-    "energy_wh": 5002.5
+    "timestamp": 1710000120000,
+    "voltage": 232.1,
+    "current": 7.8,
+    "power": 1810.4,
+    "energy_wh": 9714.7
   },
-
   {
     "node_id": "plug_01",
-    "timestamp": 1710000004000,
-    "voltage": 231.2,
-    "current": 1.30,
-    "power": 300.5,
-    "energy_wh": 1202.4
-  },
-  {
-    "node_id": "plug_02",
-    "timestamp": 1710000004000,
-    "voltage": 229.9,
-    "current": 0.75,
-    "power": 172.4,
-    "energy_wh": 802.0
-  },
-  {
-    "node_id": "main_01",
-    "timestamp": 1710000004000,
-    "voltage": 228.6,
-    "current": 4.20,
-    "power": 960.1,
-    "energy_wh": 5005.0
-  },
-
-  {
-    "node_id": "plug_01",
-    "timestamp": 1710000006000,
+    "timestamp": 1710000180000,
     "voltage": 230.8,
-    "current": 1.80,
+    "current": 1.8,
     "power": 415.4,
-    "energy_wh": 1204.0
+    "energy_wh": 1196.1
   },
   {
     "node_id": "plug_02",
-    "timestamp": 1710000006000,
+    "timestamp": 1710000180000,
+    "voltage": 231.6,
+    "current": 1.5,
+    "power": 347.4,
+    "energy_wh": 855.1
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000180000,
+    "voltage": 232.7,
+    "current": 5.2,
+    "power": 1210.0,
+    "energy_wh": 4172.3
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000180000,
+    "voltage": 231.2,
+    "current": 4.4,
+    "power": 1017.3,
+    "energy_wh": 3709.2
+  },
+  {
+    "node_id": "main_01",
+    "timestamp": 1710000180000,
+    "voltage": 233.4,
+    "current": 9.2,
+    "power": 2147.3,
+    "energy_wh": 9750.5
+  },
+  {
+    "node_id": "plug_01",
+    "timestamp": 1710000240000,
+    "voltage": 229.9,
+    "current": 2.1,
+    "power": 482.8,
+    "energy_wh": 1204.1
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000240000,
+    "voltage": 232.0,
+    "current": 1.7,
+    "power": 394.4,
+    "energy_wh": 861.7
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000240000,
+    "voltage": 233.1,
+    "current": 5.8,
+    "power": 1352.0,
+    "energy_wh": 4194.8
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000240000,
     "voltage": 231.5,
-    "current": 1.50,
-    "power": 347.2,
-    "energy_wh": 804.3
+    "current": 4.9,
+    "power": 1134.4,
+    "energy_wh": 3728.1
   },
   {
     "node_id": "main_01",
-    "timestamp": 1710000006000,
-    "voltage": 229.2,
-    "current": 5.00,
-    "power": 1146.0,
-    "energy_wh": 5010.0
+    "timestamp": 1710000240000,
+    "voltage": 233.8,
+    "current": 9.6,
+    "power": 2244.5,
+    "energy_wh": 9787.9
   },
-
   {
     "node_id": "plug_01",
-    "timestamp": 1710000008000,
-    "voltage": 229.7,
-    "current": 1.20,
-    "power": 275.6,
-    "energy_wh": 1205.2
+    "timestamp": 1710000300000,
+    "voltage": 230.4,
+    "current": 1.6,
+    "power": 368.6,
+    "energy_wh": 1210.2
   },
   {
     "node_id": "plug_02",
-    "timestamp": 1710000008000,
-    "voltage": 230.3,
-    "current": 0.60,
-    "power": 138.1,
-    "energy_wh": 805.0
+    "timestamp": 1710000300000,
+    "voltage": 231.2,
+    "current": 1.3,
+    "power": 300.6,
+    "energy_wh": 866.7
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000300000,
+    "voltage": 232.5,
+    "current": 5.1,
+    "power": 1185.8,
+    "energy_wh": 4214.6
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000300000,
+    "voltage": 230.7,
+    "current": 4.2,
+    "power": 968.9,
+    "energy_wh": 3744.2
   },
   {
     "node_id": "main_01",
-    "timestamp": 1710000008000,
-    "voltage": 228.9,
-    "current": 3.00,
-    "power": 686.7,
-    "energy_wh": 5012.0
+    "timestamp": 1710000300000,
+    "voltage": 232.9,
+    "current": 8.8,
+    "power": 2049.5,
+    "energy_wh": 9822.1
   },
-
   {
     "node_id": "plug_01",
-    "timestamp": 1710000010000,
-    "voltage": 230.5,
-    "current": 2.20,
-    "power": 506.0,
-    "energy_wh": 1208.0
-  },
-  {
-    "node_id": "plug_02",
-    "timestamp": 1710000010000,
+    "timestamp": 1710000360000,
     "voltage": 231.1,
-    "current": 2.00,
-    "power": 462.2,
-    "energy_wh": 808.5
+    "current": 2.4,
+    "power": 554.6,
+    "energy_wh": 1219.4
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000360000,
+    "voltage": 232.3,
+    "current": 2.0,
+    "power": 464.6,
+    "energy_wh": 874.4
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000360000,
+    "voltage": 233.0,
+    "current": 6.2,
+    "power": 1444.6,
+    "energy_wh": 4238.7
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000360000,
+    "voltage": 231.8,
+    "current": 5.5,
+    "power": 1274.9,
+    "energy_wh": 3765.4
   },
   {
     "node_id": "main_01",
-    "timestamp": 1710000010000,
-    "voltage": 229.4,
-    "current": 6.50,
-    "power": 1490.0,
-    "energy_wh": 5020.0
+    "timestamp": 1710000360000,
+    "voltage": 234.1,
+    "current": 9.4,
+    "power": 2200.5,
+    "energy_wh": 9858.8
+  },
+  {
+    "node_id": "plug_01",
+    "timestamp": 1710000420000,
+    "voltage": 230.6,
+    "current": 2.6,
+    "power": 599.6,
+    "energy_wh": 1229.3
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000420000,
+    "voltage": 231.9,
+    "current": 2.2,
+    "power": 510.2,
+    "energy_wh": 882.9
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000420000,
+    "voltage": 233.5,
+    "current": 6.8,
+    "power": 1587.8,
+    "energy_wh": 4265.2
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000420000,
+    "voltage": 232.1,
+    "current": 5.9,
+    "power": 1369.4,
+    "energy_wh": 3788.2
+  },
+  {
+    "node_id": "main_01",
+    "timestamp": 1710000420000,
+    "voltage": 234.4,
+    "current": 9.8,
+    "power": 2297.1,
+    "energy_wh": 9897.1
+  },
+  {
+    "node_id": "plug_01",
+    "timestamp": 1710000480000,
+    "voltage": 229.7,
+    "current": 1.9,
+    "power": 436.4,
+    "energy_wh": 1236.6
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000480000,
+    "voltage": 230.8,
+    "current": 1.6,
+    "power": 369.3,
+    "energy_wh": 889.0
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000480000,
+    "voltage": 232.8,
+    "current": 5.4,
+    "power": 1257.1,
+    "energy_wh": 4286.2
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000480000,
+    "voltage": 231.0,
+    "current": 4.8,
+    "power": 1108.8,
+    "energy_wh": 3806.7
+  },
+  {
+    "node_id": "main_01",
+    "timestamp": 1710000480000,
+    "voltage": 233.2,
+    "current": 8.7,
+    "power": 2028.8,
+    "energy_wh": 9930.9
+  },
+  {
+    "node_id": "plug_01",
+    "timestamp": 1710000540000,
+    "voltage": 230.1,
+    "current": 1.3,
+    "power": 299.1,
+    "energy_wh": 1241.6
+  },
+  {
+    "node_id": "plug_02",
+    "timestamp": 1710000540000,
+    "voltage": 231.1,
+    "current": 1.0,
+    "power": 231.1,
+    "energy_wh": 892.8
+  },
+  {
+    "node_id": "circuit_01",
+    "timestamp": 1710000540000,
+    "voltage": 232.0,
+    "current": 4.6,
+    "power": 1067.2,
+    "energy_wh": 4304.0
+  },
+  {
+    "node_id": "circuit_02",
+    "timestamp": 1710000540000,
+    "voltage": 230.4,
+    "current": 4.0,
+    "power": 921.6,
+    "energy_wh": 3822.1
+  },
+  {
+    "node_id": "main_01",
+    "timestamp": 1710000540000,
+    "voltage": 232.5,
+    "current": 8.1,
+    "power": 1883.3,
+    "energy_wh": 9962.3
   }
 ]

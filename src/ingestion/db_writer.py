@@ -29,8 +29,8 @@ def insert_telemetry(data):
         ))
 
         conn.commit()
-
         print("Inserted into PostgreSQL")
 
     except Exception as e:
+        conn.rollback()  # 🔥 IMPORTANT FIX
         print("DB insert error:", e)
