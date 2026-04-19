@@ -50,13 +50,20 @@ def process_stream(messages):
 
 
 if __name__ == "__main__":
-    sample_messages = [
-        '{"node_id":"plug_01","timestamp":1618032900000,"voltage":230.1,"current":1.78,"power":401.6,"energy_wh":1250.4}',
-        '{"node_id":"plug_02","timestamp":"bad_timestamp","voltage":230.0,"current":1.5,"power":345.0,"energy_wh":1200.0}',
-        "invalid json",
-    ]
 
-    results = process_stream(sample_messages)
+    # open the sample data file and load the energy readings
+    with open ("tests/fixtures/energy-readings.json", "r") as f:
+        records = json.load(f)
+        energy_readings = []
+
+        for record in records:
+            message = json.dumps(record)
+            energy_readings.append(message)
+
+
+
+
+    results = process_stream(energy_readings)
 
     for result in results:
         print(result)

@@ -1,0 +1,49 @@
+[
+    {
+        "node_id": "plug_01",
+        "timestamp": 1618032900000,
+        "voltage": 230.1,
+        "current": 1.78,
+        "power": 401.6,
+        "energy_wh": 1250.4
+    },
+    {
+        "node_id": "circuit_01",
+        "timestamp": 1618032960000,
+        "voltage": 231.5,
+        "current": 4.2,
+        "power": 972.3,
+        "energy_wh": 4201.8
+    },
+    {
+        "node_id": "plug_02",
+        "timestamp": "1618033020000",
+        "voltage": 229.7,
+        "current": 1.11,
+        "power": 255.0,
+        "energy_wh": 1260.2
+    },
+    {
+        "node_id": "main_01",
+        "timestamp": 1618033080000,
+        "voltage": 232.8,
+        "current": -0.4,
+        "power": 110.5,
+        "energy_wh": 9800.0
+    },
+    {
+        "node_id": "plug_03",
+        "timestamp": 1618033140000,
+        "voltage": 0,
+        "current": 0.95,
+        "power": 218.5,
+        "energy_wh": 890.0
+    },
+    {
+        "node_id": "circuit_02",
+        "timestamp": 1618033200000,
+        "voltage": 230.9,
+        "current": 3.6,
+        "energy_wh": 3650.4
+    }
+]
