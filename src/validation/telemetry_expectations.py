@@ -22,15 +22,26 @@ def validate_telemetry(data):
     if not isinstance(data["timestamp"], int):
         return False, "Field 'timestamp' must be an integer"
 
+    if data["timestamp"] <= 0:
+        return False, "Field 'timestamp' must be positive"
+
+    if len(str(data["timestamp"])) != 13:
+        return False, "Field 'timestamp' must be a valid epoch ms value"
+
     for field in ["voltage", "current", "power", "energy_wh"]:
         if not isinstance(data[field], (int, float)):
             return False, f"Field '{field}' must be a number"
 
-    if data["voltage"] <= 0:
-        return False, "Field 'voltage' must be greater than 0"
+    if not 200 <= data["voltage"] <= 250:
+        return False, "Field 'voltage' must be between 200 and 250"
 
-    for field in ["current", "power", "energy_wh"]:
-        if data[field] < 0:
-            return False, f"Field '{field}' must be a non-negative number"
+    if data["current"] <= 0:
+        return False, "Field 'current' must be greater than 0"
+
+    if data["power"] <= 0:
+        return False, "Field 'power' must be greater than 0"
+
+    if data["energy_wh"] < 0:
+        return False, "Field 'energy_wh' must be a non-negative number"
 
     return True, "Telemetry data is valid"
