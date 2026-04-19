@@ -48,6 +48,7 @@ def process_stream(messages):
 
     return results
 
+
 def summarize_windows(results, window_size_ms=2000):
     """Summarize results into time windows."""
     window_summaries = {}
@@ -60,7 +61,7 @@ def summarize_windows(results, window_size_ms=2000):
 
         timestamp = data["timestamp"]
         window_start = (timestamp // window_size_ms) * window_size_ms
-        window_end = window_start + window_size_ms -1
+        window_end = window_start + window_size_ms - 1
 
         if window_start not in window_summaries:
             window_summaries[window_start] = {
@@ -68,7 +69,7 @@ def summarize_windows(results, window_size_ms=2000):
                 "window_end": window_end,
                 "valid_record_count": 0,
             }
-        
+
         window_summaries[window_start]["valid_record_count"] += 1
 
     return list(window_summaries.values())
@@ -77,7 +78,7 @@ def summarize_windows(results, window_size_ms=2000):
 if __name__ == "__main__":
 
     # open the sample data file and load the energy readings
-    with open ("tests/fixtures/energy-readings.json", "r") as f:
+    with open("tests/fixtures/energy-readings.json", "r") as f:
         records = json.load(f)
         energy_readings = []
 

@@ -1,4 +1,3 @@
-
 REQUIRED_FIELDS = [
     "node_id",
     "timestamp",
