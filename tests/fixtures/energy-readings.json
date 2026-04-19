@@ -45,5 +45,53 @@
         "voltage": 230.9,
         "current": 3.6,
         "energy_wh": 3650.4
+    },
+    {
+        "node_id": "edge_window_end",
+        "timestamp": 1618033201999,
+        "voltage": 200.0,
+        "current": 0.5,
+        "power": 100.0,
+        "energy_wh": 3651.0
+    },
+    {
+        "node_id": "edge_window_start",
+        "timestamp": 1618033202000,
+        "voltage": 250.0,
+        "current": 0.5,
+        "power": 100.0,
+        "energy_wh": 3652.0
+    },
+    {
+        "node_id": "edge_low_voltage",
+        "timestamp": 1618033204000,
+        "voltage": 199.9,
+        "current": 1.0,
+        "power": 210.0,
+        "energy_wh": 3653.0
+    },
+    {
+        "node_id": "edge_zero_current",
+        "timestamp": 1618033206000,
+        "voltage": 220.0,
+        "current": 0,
+        "power": 150.0,
+        "energy_wh": 3654.0
+    },
+    {
+        "node_id": "edge_zero_power",
+        "timestamp": 1618033208000,
+        "voltage": 221.0,
+        "current": 0.8,
+        "power": 0,
+        "energy_wh": 3655.0
+    },
+    {
+        "node_id": "edge_short_timestamp",
+        "timestamp": 1618033208,
+        "voltage": 223.0,
+        "current": 0.9,
+        "power": 200.0,
+        "energy_wh": 3656.0
     }
 ]

@@ -48,6 +48,31 @@ def process_stream(messages):
 
     return results
 
+def summarize_windows(results, window_size_ms=2000):
+    """Summarize results into time windows."""
+    window_summaries = {}
+
+    for result in results:
+        data = result["data"]
+
+        if result["status"] == "invalid":
+            continue
+
+        timestamp = data["timestamp"]
+        window_start = (timestamp // window_size_ms) * window_size_ms
+        window_end = window_start + window_size_ms -1
+
+        if window_start not in window_summaries:
+            window_summaries[window_start] = {
+                "window_start": window_start,
+                "window_end": window_end,
+                "valid_record_count": 0,
+            }
+        
+        window_summaries[window_start]["valid_record_count"] += 1
+
+    return list(window_summaries.values())
+
 
 if __name__ == "__main__":
 
@@ -60,10 +85,8 @@ if __name__ == "__main__":
             message = json.dumps(record)
             energy_readings.append(message)
 
-
-
-
     results = process_stream(energy_readings)
+    window_summaries = summarize_windows(results)
 
-    for result in results:
-        print(result)
+    for summary in window_summaries:
+        print(summary)
