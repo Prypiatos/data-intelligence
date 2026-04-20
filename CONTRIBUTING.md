@@ -48,6 +48,17 @@
 
 ---
 
+## Issue Dependencies & Workflow
+
+All issues on GitHub have blocking relationships set up. Before picking up any issue:
+
+- **Red symbol** = it has unresolved blockers. Don't start it yet.
+- **Green symbol** = no blockers, good to pick up.
+
+When you close a blocking issue, dependent issues automatically update.
+
+---
+
 ## Development Approach
 - **Sprint 1:** Each member develops against mock data to avoid blocking dependencies
 - **Sprint 2+:** Integration with live Kafka/InfluxDB pipelines begins
