@@ -13,7 +13,13 @@ Rules checked:
 
 ## Run Locally
 
-From the `data-intelligence` folder:
+install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+run From the `data-intelligence` folder:
 
 ```bash
 python3 -m src.validation.telemetry_expectations
