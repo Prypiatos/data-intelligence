@@ -2,6 +2,8 @@ import json
 
 from src.validation.telemetry_expectations import validate_telemetry
 
+INPUT_TOPIC = "energy.telemetry"
+OUTPUT_TOPIC = "energy.telemetry.results"
 
 def parse_message(message):
     """Convert one JSON message string into a Python dictionary."""
@@ -17,6 +19,8 @@ def process_message(message):
 
     if data is None:
         return {
+            "source_topic": INPUT_TOPIC,
+            "target_topic": OUTPUT_TOPIC,
             "status": "invalid",
             "reason": "Invalid JSON format",
             "data": message,
@@ -26,12 +30,16 @@ def process_message(message):
 
     if is_valid:
         return {
+            "source_topic": INPUT_TOPIC,
+            "target_topic": OUTPUT_TOPIC,
             "status": "valid",
             "reason": validation_message,
             "data": data,
         }
 
     return {
+        "source_topic": INPUT_TOPIC,
+        "target_topic": OUTPUT_TOPIC,
         "status": "invalid",
         "reason": validation_message,
         "data": data,
@@ -49,14 +57,48 @@ def process_stream(messages):
     return results
 
 
-if __name__ == "__main__":
-    sample_messages = [
-        '{"node_id":"plug_01","timestamp":1618032900000,"voltage":230.1,"current":1.78,"power":401.6,"energy_wh":1250.4}',
-        '{"node_id":"plug_02","timestamp":"bad_timestamp","voltage":230.0,"current":1.5,"power":345.0,"energy_wh":1200.0}',
-        "invalid json",
-    ]
-
-    results = process_stream(sample_messages)
+def summarize_windows(results, window_size_ms=2000):
+    """Summarize results into time windows."""
+    window_summaries = {}
 
     for result in results:
-        print(result)
+        data = result["data"]
+
+        if result["status"] == "invalid":
+            continue
+
+        timestamp = data["timestamp"]
+        window_start = (timestamp // window_size_ms) * window_size_ms
+        window_end = window_start + window_size_ms - 1
+
+        if window_start not in window_summaries:
+            window_summaries[window_start] = {
+                "source_topic": INPUT_TOPIC,
+                "target_topic": OUTPUT_TOPIC,
+                "window_start": window_start,
+                "window_end": window_end,
+                "record_count": 0,
+                
+            }
+
+        window_summaries[window_start]["record_count"] += 1
+
+    return list(window_summaries.values())
+
+
+if __name__ == "__main__":
+
+    # open the sample data file and load the energy readings
+    with open("tests/fixtures/energy-readings.json", "r") as f:
+        records = json.load(f)
+        energy_readings = []
+
+        for record in records:
+            message = json.dumps(record)
+            energy_readings.append(message)
+
+    results = process_stream(energy_readings)
+    window_summaries = summarize_windows(results)
+
+    for summary in window_summaries:
+        print(summary)

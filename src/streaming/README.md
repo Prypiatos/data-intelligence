@@ -4,7 +4,6 @@ This module contains the Sprint 1 baseline stream processor for telemetry data.
 
 Current behavior:
 - reads mock telemetry records from `tests/fixtures/energy-readings.json`
-- parses each message from JSON
 - validates each message using `src.validation.telemetry_expectations`
 - groups valid records into 2-second tumbling windows
 - prints one summary per window with the valid record count
