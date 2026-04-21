@@ -39,7 +39,7 @@ class LSTMForecaster(nn.Module):
 
 # Train
 if __name__ == "__main__":
-    mlflow.start_run()
+    mlflow.start_run()  # type: ignore[attr-defined]
 
     # Data
     df = create_mock_data(days=30)
@@ -66,9 +66,9 @@ if __name__ == "__main__":
         print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
 
     # Log to MLflow
-    mlflow.log_param("model_type", "LSTM")
-    mlflow.log_param("epochs", 10)
-    mlflow.log_metric("loss", loss.item())
-    mlflow.end_run()
+    mlflow.log_param("model_type", "LSTM")  # type: ignore[attr-defined]
+    mlflow.log_param("epochs", 10)  # type: ignore[attr-defined]
+    mlflow.log_metric("loss", loss.item())  # type: ignore[attr-defined]
+    mlflow.end_run()  # type: ignore[attr-defined]
 
     print("✅ Model trained! Check http://localhost:5000")
