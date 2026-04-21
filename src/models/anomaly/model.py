@@ -6,11 +6,10 @@ from sklearn.preprocessing import StandardScaler
 
 from .preprocessor import apply_scaler, extract_features, fit_scaler
 
-
 SEVERITY_THRESHOLDS = {
-    "high":   -0.15,
+    "high": -0.15,
     "medium": -0.05,
-    "low":     0.0,
+    "low": 0.0,
 }
 
 
@@ -25,7 +24,12 @@ def _score_to_severity(score: float) -> str:
 
 
 class AnomalyDetector:
-    def __init__(self, contamination: float = 0.05, n_estimators: int = 100, random_state: int = 42):
+    def __init__(
+        self,
+        contamination: float = 0.05,
+        n_estimators: int = 100,
+        random_state: int = 42,
+    ):
         self.contamination = contamination
         self.n_estimators = n_estimators
         self.random_state = random_state
@@ -51,12 +55,14 @@ class AnomalyDetector:
         scores = self._model.decision_function(X_scaled)
         results = []
         for reading, score in zip(readings, scores):
-            results.append({
-                "node_id": reading.get("node_id"),
-                "timestamp": reading.get("timestamp"),
-                "anomaly_score": round(float(score), 6),
-                "severity": _score_to_severity(float(score)),
-            })
+            results.append(
+                {
+                    "node_id": reading.get("node_id"),
+                    "timestamp": reading.get("timestamp"),
+                    "anomaly_score": round(float(score), 6),
+                    "severity": _score_to_severity(float(score)),
+                }
+            )
         return results
 
     def save(self, path: str | Path) -> None:

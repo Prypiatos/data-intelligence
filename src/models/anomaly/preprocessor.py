@@ -2,8 +2,14 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-
-FEATURE_COLUMNS = ["voltage", "current", "power", "energy_wh", "power_factor", "apparent_power"]
+FEATURE_COLUMNS = [
+    "voltage",
+    "current",
+    "power",
+    "energy_wh",
+    "power_factor",
+    "apparent_power",
+]
 
 
 def extract_features(readings: list[dict]) -> pd.DataFrame:

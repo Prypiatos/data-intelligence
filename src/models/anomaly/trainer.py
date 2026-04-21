@@ -13,11 +13,10 @@ import random
 import time
 from pathlib import Path
 
-import mlflow
+import mlflow  # type: ignore[attr-defined]
 import numpy as np
 
 from .model import AnomalyDetector
-
 
 EXPERIMENT_NAME = "anomaly-detection"
 MODEL_OUTPUT_DIR = Path("models/anomaly")
@@ -43,14 +42,16 @@ def _generate_mock_readings(n: int = 300, anomaly_fraction: float = 0.05) -> lis
             current = rng.uniform(0.5, 10)
             power = voltage * current * rng.uniform(0.85, 0.99)
 
-        readings.append({
-            "node_id": rng.choice(_NODE_IDS),
-            "timestamp": base_ts + i * 60_000,
-            "voltage": round(voltage, 2),
-            "current": round(current, 3),
-            "power": round(power, 2),
-            "energy_wh": round(power / 60, 4),
-        })
+        readings.append(
+            {
+                "node_id": rng.choice(_NODE_IDS),
+                "timestamp": base_ts + i * 60_000,
+                "voltage": round(voltage, 2),
+                "current": round(current, 3),
+                "power": round(power, 2),
+                "energy_wh": round(power / 60, 4),
+            }
+        )
 
     return readings
 
@@ -61,7 +62,9 @@ def _compute_metrics(predictions: list[dict]) -> dict:
     return {
         "n_readings": len(predictions),
         "n_anomalies": sum(1 for s in severities if s != "normal"),
-        "anomaly_rate": round(sum(1 for s in severities if s != "normal") / len(predictions), 4),
+        "anomaly_rate": round(
+            sum(1 for s in severities if s != "normal") / len(predictions), 4
+        ),
         "mean_score": round(float(np.mean(scores)), 6),
         "min_score": round(float(np.min(scores)), 6),
         "max_score": round(float(np.max(scores)), 6),
@@ -74,23 +77,25 @@ def train(
     n_readings: int = 300,
     output_dir: Path = MODEL_OUTPUT_DIR,
 ) -> AnomalyDetector:
-    mlflow.set_tracking_uri("./mlruns")
-    mlflow.set_experiment(EXPERIMENT_NAME)
+    mlflow.set_tracking_uri("./mlruns")  # type: ignore[attr-defined]
+    mlflow.set_experiment(EXPERIMENT_NAME)  # type: ignore[attr-defined]
 
     readings = _generate_mock_readings(n=n_readings, anomaly_fraction=contamination)
 
-    with mlflow.start_run():
-        detector = AnomalyDetector(contamination=contamination, n_estimators=n_estimators)
+    with mlflow.start_run():  # type: ignore[attr-defined]
+        detector = AnomalyDetector(
+            contamination=contamination, n_estimators=n_estimators
+        )
         detector.fit(readings)
 
-        mlflow.log_params({**detector.params, "n_readings": n_readings})
+        mlflow.log_params({**detector.params, "n_readings": n_readings})  # type: ignore[attr-defined]
 
         predictions = detector.predict(readings)
         metrics = _compute_metrics(predictions)
-        mlflow.log_metrics(metrics)
+        mlflow.log_metrics(metrics)  # type: ignore[attr-defined]
 
         detector.save(output_dir)
-        mlflow.log_artifact(str(output_dir / "detector.pkl"))
+        mlflow.log_artifact(str(output_dir / "detector.pkl"))  # type: ignore[attr-defined]
 
         print(f"Training complete. Metrics: {metrics}")
         print(f"Model saved to: {output_dir}")
