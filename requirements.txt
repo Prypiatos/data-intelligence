@@ -40,7 +40,7 @@ pyspark==3.4.0
 # ============================================
 # Data Quality & Validation
 # ============================================
-great-expectations==0.17.12
+great-expectations
 
 # ============================================
 # Workflow Orchestration
@@ -54,7 +54,7 @@ apache-airflow-providers-apache-spark==4.1.1
 # ============================================
 psycopg2-binary==2.9.7
 influxdb-client==1.18.0
-sqlalchemy==2.0.20
+sqlalchemy==1.4.54
 
 # ============================================
 # API & Web Framework
@@ -98,7 +98,7 @@ pytest-mock==3.11.1
 # ============================================
 black==23.9.1
 flake8==6.0.0
-pylint==2.18.2
+pylint==2.17.7
 mypy==1.5.1
 
 # ============================================
