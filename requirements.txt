@@ -24,7 +24,7 @@ prophet==1.1.4
 # MLOps & Experiment Tracking
 # ============================================
 mlflow==2.7.0
-optuna==3.3.1
+optuna==3.3.0
 
 # ============================================
 # Streaming & Real-Time Processing
