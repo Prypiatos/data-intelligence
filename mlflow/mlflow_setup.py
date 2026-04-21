@@ -221,7 +221,7 @@ class MLflowSetup:
                 # Print metrics
                 metric_cols = [col for col in runs.columns if col.startswith('metrics.')]
                 if metric_cols:
-                    print(f"  Metrics:")
+                    print("  Metrics:")
                     for metric_col in metric_cols:
                         value = run[metric_col]
                         metric_name = metric_col.replace('metrics.', '')
