@@ -1,9 +1,308 @@
-# MLflow tracking server configuration
+# MLflow Tracking Server Configuration
 # Experiment tracking, model registry, and artifact storage
+# Task #15: MLflow Experiment Tracking Setup
 
-tracking_uri: http://mlflow:5000
-artifact_location: s3://mlflow-artifacts  # or local path for dev
+# ============================================
+# TRACKING SERVER CONFIGURATION
+# ============================================
+
+# Local development (Sprint 1)
+tracking_uri_dev: http://localhost:5000
+
+# Docker deployment (Sprint 2)
+tracking_uri_docker: http://mlflow:5000
+
+# Production (Future)
+tracking_uri_prod: https://mlflow.company.com
+
+# ============================================
+# ARTIFACT STORAGE
+# ============================================
+
+# Local development
+artifact_location_dev: ./mlflow/artifacts
+
+# Docker deployment
+artifact_location_docker: /mlflow/artifacts
+
+# Production (S3 for scalability)
+artifact_location_prod: s3://mlflow-artifacts
+
+# S3 Configuration (if using AWS)
+s3_config:
+  bucket: mlflow-artifacts
+  prefix: energy-forecasting
+  region: us-east-1
+
+# ============================================
+# BACKEND STORE
+# ============================================
+
+# Local development (SQLite)
+backend_store_dev: sqlite:///mlflow/mlruns.db
+
+# Docker deployment (PostgreSQL)
+backend_store_docker: postgresql://postgres:postgres@postgres:5432/mlflow
+
+# Production (RDS)
+backend_store_prod: postgresql://user:password@rds-endpoint:5432/mlflow
+
+# ============================================
+# EXPERIMENTS CONFIGURATION
+# ============================================
 
 experiments:
+  
+  # Load Forecasting Experiment
   - name: load-forecasting
+    description: "LSTM model for 24-hour energy consumption forecasting"
+    tags:
+      team: E2
+      component: Forecasting
+      model_type: LSTM
+      task: load_forecasting
+    
+    # Expected parameters for this experiment
+    parameters:
+      - model_type
+      - epochs
+      - batch_size
+      - learning_rate
+      - hidden_size
+      - num_layers
+      - forecast_horizon
+    
+    # Expected metrics for this experiment
+    metrics:
+      - train_loss
+      - test_loss
+      - mape
+      - rmse
+      - mae
+      - inference_time_ms
+    
+    # Tags to auto-apply to runs
+    run_tags:
+      component: forecasting
+      model_family: lstm
+
+  # Anomaly Detection Experiment
   - name: anomaly-detection
+    description: "Isolation Forest model for detecting anomalies in energy consumption"
+    tags:
+      team: E2
+      component: Anomaly Detection
+      model_type: IsolationForest
+      task: anomaly_detection
+    
+    # Expected parameters for this experiment
+    parameters:
+      - model_type
+      - contamination
+      - random_state
+      - n_estimators
+      - max_samples
+    
+    # Expected metrics for this experiment
+    metrics:
+      - precision
+      - recall
+      - f1_score
+      - auc_roc
+      - detection_latency_ms
+    
+    # Tags to auto-apply to runs
+    run_tags:
+      component: anomaly_detection
+      model_family: isolation_forest
+
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+
+logging:
+  # Auto-log framework settings
+  autolog:
+    sklearn: true
+    torch: true
+    tensorflow: false
+  
+  # Log level
+  level: INFO
+  
+  # Log file
+  log_file: mlflow/mlflow.log
+
+# ============================================
+# MODEL REGISTRY CONFIGURATION
+# ============================================
+
+model_registry:
+  enabled: true
+  
+  # Models to track in registry
+  models:
+    - name: lstm-load-forecasting
+      description: "LSTM model for 24-hour load forecasting"
+      stage: Development  # Development, Staging, Production
+      team: E2
+    
+    - name: isolation-forest-anomaly
+      description: "Isolation Forest for anomaly detection in energy data"
+      stage: Development
+      team: E2
+
+# ============================================
+# DASHBOARD CONFIGURATION
+# ============================================
+
+dashboard:
+  # Enable/disable dashboard features
+  enabled: true
+  
+  # Dashboard port
+  port: 5000
+  
+  # Host
+  host: 0.0.0.0
+  
+  # Features
+  features:
+    experiments: true
+    runs: true
+    models: true
+    compare_runs: true
+    search: true
+    charts: true
+
+# ============================================
+# RUN CONFIGURATION
+# ============================================
+
+run:
+  # Auto-end run after this duration (minutes)
+  # Set to 0 to disable auto-end
+  auto_end_duration: 0
+  
+  # Run naming convention
+  naming_convention: "{experiment_name}_{timestamp}"
+  
+  # Auto-create experiment if not exists
+  auto_create_experiment: true
+  
+  # Run tags (applied to all runs)
+  default_tags:
+    project: energy-management
+    team: E2
+    version: "1.0"
+
+# ============================================
+# ARTIFACT TRACKING
+# ============================================
+
+artifacts:
+  # Log models
+  log_models: true
+  
+  # Log plots/images
+  log_plots: true
+  
+  # Log data files
+  log_data: true
+  
+  # Log training artifacts
+  log_artifacts: true
+  
+  # Maximum artifact size (MB)
+  max_artifact_size_mb: 1000
+  
+  # Artifacts to log
+  files_to_log:
+    - "*.pkl"      # Pickled models
+    - "*.pth"      # PyTorch models
+    - "*.joblib"   # Sklearn models
+    - "*.json"     # Metrics
+    - "*.csv"      # Data/results
+    - "*.png"      # Plots
+    - "*.html"     # Interactive plots
+
+# ============================================
+# COMPARISON & ANALYSIS
+# ============================================
+
+comparison:
+  # Enable run comparison
+  enabled: true
+  
+  # Metrics to compare by default
+  default_metrics:
+    - mape
+    - rmse
+    - inference_time_ms
+  
+  # Parameters to compare by default
+  default_params:
+    - learning_rate
+    - batch_size
+    - epochs
+
+# ============================================
+# NOTIFICATIONS
+# ============================================
+
+notifications:
+  # Enable/disable notifications
+  enabled: false
+  
+  # Notification channels
+  channels:
+    slack:
+      enabled: false
+      webhook_url: ""
+      on_events:
+        - run_complete
+        - run_failed
+    
+    email:
+      enabled: false
+      smtp_server: ""
+      on_events:
+        - run_complete
+
+# ============================================
+# RETENTION POLICY
+# ============================================
+
+retention:
+  # Keep runs for X days
+  keep_runs_days: 90
+  
+  # Archive old runs
+  archive_runs: true
+  
+  # Delete artifacts after X days
+  delete_artifacts_days: 180
+
+# ============================================
+# DEVELOPMENT vs PRODUCTION
+# ============================================
+
+environments:
+  
+  development:
+    tracking_uri: http://localhost:5000
+    artifact_location: ./mlflow/artifacts
+    backend_store: sqlite:///mlflow/mlruns.db
+    debug: true
+  
+  docker:
+    tracking_uri: http://mlflow:5000
+    artifact_location: /mlflow/artifacts
+    backend_store: postgresql://postgres:postgres@postgres:5432/mlflow
+    debug: false
+  
+  production:
+    tracking_uri: https://mlflow.company.com
+    artifact_location: s3://mlflow-artifacts
+    backend_store: postgresql://prod-user:prod-pass@rds.amazonaws.com:5432/mlflow
+    debug: false
