@@ -1,12 +1,20 @@
 from fastapi import FastAPI
+from src.api.schemas import (
+    MessageResponse,
+    ForecastResponse,
+    AnomalyResponse,
+    RecommendationResponse,
+)
 
 app = FastAPI()
 
-@app.get("/")
+
+@app.get("/", response_model=MessageResponse)
 def root():
     return {"message": "API running"}
 
-@app.get("/forecasts")
+
+@app.get("/forecasts", response_model=ForecastResponse)
 def get_forecasts():
     return {
         "node_id": 1,
@@ -17,7 +25,7 @@ def get_forecasts():
     }
 
 
-@app.get("/anomalies")
+@app.get("/anomalies", response_model=AnomalyResponse)
 def get_anomalies():
     return {
         "node_id": 1,
@@ -26,7 +34,7 @@ def get_anomalies():
     }
 
 
-@app.get("/recommendations")
+@app.get("/recommendations", response_model=RecommendationResponse)
 def get_recommendations():
     return {
         "node_id": 1,
