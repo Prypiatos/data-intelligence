@@ -5,6 +5,7 @@ from src.validation.telemetry_expectations import validate_telemetry
 INPUT_TOPIC = "energy.telemetry"
 OUTPUT_TOPIC = "energy.telemetry.results"
 
+
 def parse_message(message):
     """Convert one JSON message string into a Python dictionary."""
     try:
@@ -78,7 +79,6 @@ def summarize_windows(results, window_size_ms=2000):
                 "window_start": window_start,
                 "window_end": window_end,
                 "record_count": 0,
-                
             }
 
         window_summaries[window_start]["record_count"] += 1
