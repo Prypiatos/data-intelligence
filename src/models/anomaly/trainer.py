@@ -9,6 +9,7 @@ MLflow UI:
     open http://localhost:5000
 """
 
+import os
 import random
 import time
 from pathlib import Path
@@ -77,7 +78,7 @@ def train(
     n_readings: int = 300,
     output_dir: Path = MODEL_OUTPUT_DIR,
 ) -> AnomalyDetector:
-    mlflow.set_tracking_uri("./mlruns")  # type: ignore[attr-defined]
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))  # type: ignore[attr-defined]
     mlflow.set_experiment(EXPERIMENT_NAME)  # type: ignore[attr-defined]
 
     readings = _generate_mock_readings(n=n_readings, anomaly_fraction=contamination)
