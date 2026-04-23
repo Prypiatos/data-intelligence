@@ -1,22 +1,20 @@
 # Stream Processing
 
-This module contains the Sprint 1 baseline stream processor for telemetry data.
+This module contains the Sprint 1 baseline Flink job for telemetry data.
 
 Current behavior:
 - reads mock telemetry records from `tests/fixtures/energy-readings.json`
 - validates each message using `src.validation.telemetry_expectations`
 - groups valid records into 2-second tumbling windows
-- prints one summary per window with the valid record count
-
-Windowing:
-- window size is `2000` milliseconds
+- prints summary per window
 
 ## Run Locally
+Install the dependencies in `requirements.txt` before running the job.
 
 From the `data-intelligence` folder:
 
 ```bash
-python3 -m src.streaming.stream_processor
+python3 -m src.streaming.flink_stream_job
 ```
 
-This is a mock-data version for Sprint 1. Kafka input and output can be added in Sprint 2.
+This is the Sprint 1 mock-data version.
