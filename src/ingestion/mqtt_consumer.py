@@ -1,10 +1,8 @@
 import json
 import paho.mqtt.client as mqtt
 
+from kafka_producer import publish_events, publish_health, publish_telemetry
 from validator import validate_telemetry
-from kafka_producer import publish_telemetry, publish_events, publish_health
-from db_writer import insert_telemetry
-from influx_writer import write_telemetry
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -25,8 +23,6 @@ def handle_telemetry(topic, data):
     print("Valid telemetry message:", data)
 
     publish_telemetry(data)
-    insert_telemetry(data)
-    write_telemetry(data)
 
 
 def handle_event(topic, data):
@@ -49,19 +45,15 @@ def on_message(client, userdata, msg):
 
         if topic.endswith("/telemetry"):
             handle_telemetry(topic, data)
-
         elif topic.endswith("/events"):
             handle_event(topic, data)
-
         elif topic.endswith("/health"):
             handle_health(topic, data)
-
         else:
             print("Unknown topic:", topic)
 
     except json.JSONDecodeError:
         print("Error: invalid JSON payload")
-
     except Exception as error:
         print("Error processing MQTT message:", error)
 
