@@ -10,8 +10,8 @@ def create_consumer():
     return KafkaConsumer(
         "energy.telemetry",
         bootstrap_servers="localhost:9092",
-        auto_offset_reset="earliest",   
-        enable_auto_commit=False,       
+        auto_offset_reset="earliest",
+        enable_auto_commit=False,
         group_id="energy-storage-writer",
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
     )
@@ -30,7 +30,7 @@ def process_telemetry(data):
 
     if inserted:
         try:
-            write_telemetry(data)  
+            write_telemetry(data)
         except Exception as e:
             print("InfluxDB write failed:", e)
             return False
