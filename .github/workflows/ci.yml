@@ -5,7 +5,55 @@ on:
   pull_request:
 
 jobs:
-  placeholder:
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - run: echo "CI not configured yet"
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install ruff black mypy
+
+      - name: Run ruff
+        run: ruff check .
+
+      - name: Check black formatting
+        run: black --check .
+
+      - name: Run mypy
+        run: mypy src/ --ignore-missing-imports
+
+  dependencies:
+    name: Validate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check requirements.txt installs cleanly
+        run: pip install -r requirements.txt --dry-run
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          extra_args: --only-verified

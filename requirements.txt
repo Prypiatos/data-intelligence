@@ -1,7 +1,7 @@
 # ============================================
 # E2 Data Intelligence - Python Requirements
-# (Forecasting & ML Ops ONLY)
 # ============================================
+# Install with: pip install -r requirements.txt
 
 # ============================================
 # Core Data Processing
@@ -24,7 +24,13 @@ prophet==1.1.4
 # MLOps & Experiment Tracking
 # ============================================
 mlflow==2.7.0
-optuna==3.3.1
+optuna==3.3.0
+
+# ============================================
+# Streaming & Real-Time Processing
+# ============================================
+kafka-python==2.0.2
+paho-mqtt==1.6.1
 
 # ============================================
 # Batch Processing
@@ -32,19 +38,36 @@ optuna==3.3.1
 pyspark==3.4.0
 
 # ============================================
+# Data Quality & Validation
+# ============================================
+great-expectations
+
+# ============================================
+# Workflow Orchestration
+# ============================================
+apache-airflow==2.6.2
+apache-airflow-providers-postgres==5.5.1
+apache-airflow-providers-apache-spark==4.1.1
+
+# ============================================
 # Database Connectors
 # ============================================
 psycopg2-binary==2.9.7
 influxdb-client==1.18.0
-sqlalchemy==2.0.20
+sqlalchemy==1.4.54
 
 # ============================================
-# API & Web Framework (for serving models)
+# API & Web Framework
 # ============================================
 fastapi==0.103.0
 uvicorn==0.23.2
 pydantic==2.3.0
 python-dotenv==1.0.0
+
+# ============================================
+# Caching & Redis
+# ============================================
+redis==5.0.0
 
 # ============================================
 # Visualization & Plotting
@@ -59,6 +82,7 @@ seaborn==0.12.2
 python-dateutil==2.8.2
 pytz==2023.3
 requests==2.31.0
+click==8.1.7
 tqdm==4.66.1
 
 # ============================================
@@ -66,9 +90,31 @@ tqdm==4.66.1
 # ============================================
 pytest==7.4.0
 pytest-cov==4.1.0
+pytest-asyncio==0.21.1
 pytest-mock==3.11.1
+
+# ============================================
+# Code Quality & Linting
+# ============================================
+black==23.9.1
+flake8==6.0.0
+pylint==2.17.7
+mypy==1.5.1
 
 # ============================================
 # Logging & Monitoring
 # ============================================
 python-json-logger==2.0.7
+
+# ============================================
+# Documentation
+# ============================================
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
+
+# ============================================
+# Jupyter & Interactive Development
+# ============================================
+jupyter==1.0.0
+jupyterlab==4.0.3
+ipython==8.15.0

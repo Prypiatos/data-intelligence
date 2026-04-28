@@ -18,6 +18,14 @@ E2 is responsible for the data and intelligence layer of the Energy Management S
 
 ---
 
+# System Architecture
+
+---
+
+![Architecture Diagram](./architecture.png)
+
+---
+
 ## Tech Stack
 | Area | Tools |
 |---|---|
@@ -123,6 +131,5 @@ pytest tests/ -v
 ---
 
 ## Related Repositories
-- [E1 - Device & Edge Systems](#)
-- [E3 - System Engineering & Interaction](#)
-- [E4 - Platform, Security & Integration](#)
+- [E1 - Device & Edge Systems](https://github.com/Prypiatos/energy-edge-nodes)
+- [E3 - System Engineering & Interaction](https://github.com/Prypiatos/ems-app)

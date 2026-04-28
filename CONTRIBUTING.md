@@ -48,6 +48,17 @@
 
 ---
 
+## Issue Dependencies & Workflow
+
+All issues on GitHub have blocking relationships set up. Before picking up any issue:
+
+- **Red symbol** = it has unresolved blockers. Don't start it yet.
+- **Green symbol** = no blockers, good to pick up.
+
+When you close a blocking issue, dependent issues automatically update.
+
+---
+
 ## Development Approach
 - **Sprint 1:** Each member develops against mock data to avoid blocking dependencies
 - **Sprint 2+:** Integration with live Kafka/InfluxDB pipelines begins
@@ -57,15 +68,15 @@
 ---
 
 ## Branches
-Each member has their own branch. Work there, don't push to other branches.
+Create a new branch for each piece of work. Name it after what it does, short and self explanatory. Like this.
 
-| Branch | Owner |
-|---|---|
-| `anomaly-detection` | Tharupahan |
-| `data-ingestion` | Jitharsanan |
-| `load-forecasting` | Didula |
-| `stream-processing` | Kajatheepan |
-| `analytics-api` | Babijana |
+```
+dockerfile-ingestion
+unit-tests-forecasting
+kafka-consumer-validation
+```
+
+Always take a branch from `main`. Never take a branch from someone else's branch. One branch per issue, one PR per branch.
 
 ---
 
