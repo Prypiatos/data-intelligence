@@ -30,7 +30,10 @@ def process_telemetry(data):
     inserted = insert_telemetry(data)
 
     if inserted is None:
-        print("PostgreSQL insert failed")
+        print(
+            f"WARNING: PostgreSQL insert failed for {data.get('node_id')}; "
+            "message will be retried"
+        )
         return False
 
     if inserted is False:
