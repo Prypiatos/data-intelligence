@@ -10,8 +10,8 @@ def create_consumer():
     return KafkaConsumer(
         "energy.telemetry",
         bootstrap_servers="localhost:9092",
-        auto_offset_reset="latest",
-        enable_auto_commit=True,
+        auto_offset_reset="earliest",   
+        enable_auto_commit=False,       
         group_id="energy-storage-writer",
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
     )
@@ -22,16 +22,22 @@ def process_telemetry(data):
 
     if not is_valid:
         print("Invalid telemetry:", message)
-        return
+        return False
 
     print("Valid telemetry from Kafka:", data)
 
     inserted = insert_telemetry(data)
 
     if inserted:
-        write_telemetry(data)
+        try:
+            write_telemetry(data)  
+        except Exception as e:
+            print("InfluxDB write failed:", e)
+            return False
     else:
         print("Skipped InfluxDB write for duplicate telemetry")
+
+    return True
 
 
 def main():
@@ -41,7 +47,11 @@ def main():
 
     for message in consumer:
         try:
-            process_telemetry(message.value)
+            success = process_telemetry(message.value)
+
+            # ✅ commit ONLY after success
+            if success:
+                consumer.commit()
 
         except Exception as e:
             print("Error processing message:", e)
