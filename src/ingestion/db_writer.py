@@ -37,12 +37,12 @@ def insert_telemetry(data):
 
         if inserted:
             print("Inserted into PostgreSQL")
-        else:
-            print("Duplicate telemetry skipped in PostgreSQL")
+            return True
 
-        return inserted
+        print("Duplicate telemetry skipped in PostgreSQL")
+        return False
 
     except Exception as error:
         conn.rollback()
-        print("DB insert error:", error)
-        return False
+        print("WARNING: PostgreSQL insert failed:", error)
+        return None
