@@ -125,7 +125,7 @@ def initialize_forecasting():
         
     except Exception as e:
         print(f"❌ Error initializing forecasting model: {str(e)}")
-        print("   The API will continue running but predictions won't work")
+        print("The API will continue running but predictions won't work")
         # We don't raise an exception here because we want the API to start
         # even if model loading fails. This is useful for debugging.
 
