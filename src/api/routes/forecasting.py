@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import torch
 import numpy as np
 import os
-from typing import List
+from typing import List, Optional
 
 from src.models.forecasting.lstm_model import LSTMForecaster
 from sklearn.preprocessing import MinMaxScaler
@@ -20,9 +20,9 @@ router = APIRouter(prefix="/forecast", tags=["forecasting"])
 
 # Global variables to hold the model and scaler (loaded once at startup)
 # Using global variables here is fine because the model doesn't change during runtime
-model = None
-device = None
-scaler = None
+model: Optional[LSTMForecaster] = None
+device: Optional[torch.device] = None
+scaler: Optional[MinMaxScaler] = None
 
 # ============================================
 # Request and Response Models
@@ -162,6 +162,11 @@ def predict(request: PredictionRequest):
             status_code=503,  # Service Unavailable
             detail="Model not loaded. Try again in a moment.",
         )
+    if scaler is None or device is None:
+        raise HTTPException(
+            status_code=503,  # Service Unavailable
+            detail="Forecasting service not initialized. Try again in a moment.",
+        )
 
     try:
         # Validate input length
@@ -235,6 +240,11 @@ def predict_batch(request: BatchPredictionRequest):
     if model is None:
         raise HTTPException(
             status_code=503, detail="Model not loaded. Try again in a moment."
+        )
+    if scaler is None or device is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Forecasting service not initialized. Try again in a moment.",
         )
 
     try:
