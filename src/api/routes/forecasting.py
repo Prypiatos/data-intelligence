@@ -109,7 +109,7 @@ def initialize_forecasting():
             print(f"   ✅ Model loaded from {model_path}")
         else:
             print(f"   ⚠️  Model file not found at {model_path}")
-            print(f"   API will use untrained model (predictions won't be accurate)")
+            print("   API will use untrained model (predictions won't be accurate)")
         
         # Set model to evaluation mode
         # This disables dropout and other training-specific behaviors
@@ -119,7 +119,7 @@ def initialize_forecasting():
         # We normalize to 0-1 range, with 0W and 800W as the bounds
         scaler = MinMaxScaler()
         scaler.fit([[0], [800]])
-        print("   ✅ Scaler initialized")
+        print("✅ Scaler initialized")
         
         print("✅ Forecasting model ready!")
         
