@@ -25,10 +25,7 @@ app = FastAPI(
     title="Energy Management System API",
     description="API for the E2 Data & Intelligence team - Forecasting, ingestion, streaming, and more",
     version="1.0.0",
-    contact={
-        "name": "E2 Data & Intelligence Team",
-        "email": "e2@prypiatos.com"
-    }
+    contact={"name": "E2 Data & Intelligence Team", "email": "e2@prypiatos.com"},
 )
 
 # ============================================
@@ -64,11 +61,12 @@ app.include_router(forecasting.router)
 # Root Endpoint
 # ============================================
 
+
 @app.get("/")
 def root():
     """
     Root endpoint with API information.
-    
+
     Returns basic information about the API and links to documentation.
     """
     return {
@@ -79,33 +77,35 @@ def root():
             "health": "/health (GET)",
             "forecast": "/forecast/predict (POST)",
             "forecast_batch": "/forecast/predict-batch (POST)",
-            "documentation": "/docs (GET)"
+            "documentation": "/docs (GET)",
         },
-        "docs_url": "/docs"
+        "docs_url": "/docs",
     }
+
 
 # ============================================
 # Startup and Shutdown Events
 # ============================================
 
+
 @app.on_event("startup")
 async def startup_event():
     """
     Run when the API starts up.
-    
+
     Initialize all modules and load models. This runs once when the
     Docker container starts, not on every request.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🚀 Energy Management System API Startup")
-    print("="*80)
-    
+    print("=" * 80)
+
     # Initialize forecasting model
     # This calls the initialize_forecasting function in forecasting.py
     forecasting.initialize_forecasting()
-    
+
     print("\n✅ All systems initialized successfully!")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
 
 @app.on_event("shutdown")
@@ -121,10 +121,5 @@ async def shutdown_event():
 if __name__ == "__main__":
     # This allows running the app directly: python src/api/main.py
     import uvicorn
-    
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info"
-    )
+
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

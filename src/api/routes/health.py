@@ -14,27 +14,28 @@ from pydantic import BaseModel
 # tags=["health"] is for organizing in the API documentation
 router = APIRouter(prefix="/health", tags=["health"])
 
+
 # Define the response model so clients know what to expect
 class HealthResponse(BaseModel):
     """Response from health check endpoint."""
+
     status: str  # "healthy" or "unhealthy"
     version: str  # API version
     service: str  # Name of the service
+
 
 # Define the health check endpoint
 @router.get("")
 def health_check():
     """
     Health check endpoint.
-    
+
     Returns the current status of the API. Monitoring systems call this
     regularly to detect if the service has crashed or is unresponsive.
-    
+
     Returns:
         HealthResponse with status and version info
     """
     return HealthResponse(
-        status="healthy",
-        version="1.0.0",
-        service="Load Forecasting API"
+        status="healthy", version="1.0.0", service="Load Forecasting API"
     )
