@@ -119,7 +119,7 @@ def initialize_forecasting():
         # We normalize to 0-1 range, with 0W and 800W as the bounds
         scaler = MinMaxScaler()
         scaler.fit([[0], [800]])
-        print(f"   ✅ Scaler initialized")
+        print("   ✅ Scaler initialized")
         
         print("✅ Forecasting model ready!")
         
