@@ -1,0 +1,128 @@
+services:
+  postgres:
+    image: postgres:13
+    container_name: energy-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: energy_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./db/postgres/02-mock-data.sql:/docker-entrypoint-initdb.d/02-mock-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - energy_network
+
+  spark-master:
+    image: apache/spark:3.5.1
+    container_name: energy-spark
+    environment:
+      SPARK_MODE: master
+    ports:
+      - "8888:8080"
+      - "7077:7077"
+    volumes:
+      - ./src:/app/src
+      - ./dags:/app/dags
+    depends_on:
+      - postgres
+  
+    restart: unless-stopped
+
+  mlflow:
+    image: python:3.11
+    container_name: energy-mlflow
+    working_dir: /app
+    command: bash -c "pip install mlflow && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://postgres:postgres@postgres:5432/mlflow --default-artifact-root /mlflow/artifacts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow/artifacts
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: energy_db
+    networks:
+      - energy_network
+
+  airflow-webserver:
+    image: apache/airflow:2.6.2
+    container_name: energy-airflow-webserver
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432/energy_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /app
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: energy_db
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/app/dags
+      - ./src:/app/src
+      - ./models:/app/models
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com --no-password || true &&
+      airflow webserver
+      "
+    networks:
+      - energy_network
+
+  airflow-scheduler:
+    image: apache/airflow:2.6.2
+    container_name: energy-airflow-scheduler
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432/energy_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: /app
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: energy_db
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./dags:/app/dags
+      - ./src:/app/src
+      - ./models:/app/models
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      - postgres
+      - airflow-webserver
+    command: airflow scheduler
+    networks:
+      - energy_network
+
+   
+
+volumes:
+  postgres_data:
+  mlflow_data:
+  airflow_logs:
+
+
+networks:
+  energy_network:
+    driver: bridge
