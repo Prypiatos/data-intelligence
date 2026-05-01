@@ -16,6 +16,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U energy_user"]
       interval: 10s
@@ -121,7 +122,7 @@ services:
   # ============================================
 
   spark-master:
-    image: bitnami/spark:3.4.0
+    image: apache/spark:latest
     container_name: spark-master
     environment:
       SPARK_MODE: master
@@ -138,7 +139,7 @@ services:
       - energy_network
 
   spark-worker:
-    image: bitnami/spark:3.4.0
+    image: apache/spark:latest
     container_name: spark-worker
     depends_on:
       - spark-master
@@ -251,9 +252,29 @@ services:
       - airflow_logs:/opt/airflow/logs
     depends_on:
       - postgres
-    command: /bin/bash -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver"
+    command: /bin/bash -c "airflow db init && airflow users create --username admin --password admin123 --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver"
     networks:
       - energy_network
+
+  airflow-scheduler:
+    image: apache/airflow:2.6.2
+    container_name: airflow-scheduler
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://energy_user:energy_pass@postgres:5432/energy_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./dags:/app/dags
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      - postgres
+      - airflow-webserver
+    command: airflow scheduler
+    networks:
+      - energy_network
+
+      
 
 volumes:
   postgres_data:
