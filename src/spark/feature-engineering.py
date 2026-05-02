@@ -70,7 +70,9 @@ class Config:
         logger.info("✅ PostgreSQL configuration validated")
 
     # Tables (PostgreSQL schema)
-    RAW_TABLE = "telemetry_readings"  # Source: raw telemetry with voltage, current, power
+    RAW_TABLE = (
+        "telemetry_readings"  # Source: raw telemetry with voltage, current, power
+    )
     NODE_METADATA_TABLE = "node_metadata"  # Source: node type and location info
     HOURLY_TABLE = "hourly_energy_readings"  # Intermediate: aggregated to hourly
     FEATURES_TABLE = "energy_features"  # Output: engineered features
@@ -145,7 +147,7 @@ def create_spark_session() -> SparkSession:
 def read_raw_data(spark):
     """
     Read raw telemetry data from PostgreSQL.
-    
+
     Returns a DataFrame with columns: node_id, timestamp, voltage, current, power, energy_wh
     """
     try:
@@ -167,7 +169,9 @@ def read_raw_data(spark):
         row_count = df.count()
         logger.info(f"✅ Read {row_count:,} rows from {Config.RAW_TABLE}")
         logger.info("   Sampling rate: 0.5Hz (1 reading every 2 seconds)")
-        logger.info(f"   Approximate duration: {row_count / Config.READINGS_PER_HOUR:.1f} hours")
+        logger.info(
+            f"   Approximate duration: {row_count / Config.READINGS_PER_HOUR:.1f} hours"
+        )
 
         # Show sample
         logger.info("Sample raw data (0.5Hz):")
@@ -248,7 +252,7 @@ def aggregate_to_hourly(df):
         logger.info(f"✅ Aggregated to {hourly_count:,} hourly readings by node")
         logger.info(f"   Original readings: {df.count():,}")
         logger.info(f"   Reduction ratio: {df.count() / hourly_count:.0f}:1")
-        
+
         # Show sample by node
         logger.info("Sample hourly data (by node):")
         hourly_df.orderBy("node_id", "timestamp").limit(5).show(truncate=False)
@@ -297,9 +301,9 @@ def engineer_features(df):
         # ============================================
         # 2. Lag Features (on hourly data, per node)
         # ============================================
-        
+
         logger.info("  Creating lag features (per node)...")
-        
+
         # Window specification: order by timestamp within each node
         window_spec = Window.partitionBy("node_id").orderBy("timestamp")
         df_with_lags = df_with_time
@@ -331,18 +335,24 @@ def engineer_features(df):
         logger.info("  Creating rolling window features (per node)...")
 
         # 24-hour window - partitioned by node, ordered by timestamp
-        window_24h = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -24 * 3600, 0  # -24 hours in seconds
+        window_24h = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-24 * 3600, 0)  # -24 hours in seconds
         )
 
         # 7-day window - partitioned by node, ordered by timestamp
-        window_7d = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -7 * 24 * 3600, 0  # -7 days in seconds
+        window_7d = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-7 * 24 * 3600, 0)  # -7 days in seconds
         )
 
         # 30-day window - partitioned by node, ordered by timestamp
-        window_30d = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -30 * 24 * 3600, 0  # -30 days in seconds
+        window_30d = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-30 * 24 * 3600, 0)  # -30 days in seconds
         )
 
         df_with_rolling = (
@@ -386,7 +396,7 @@ def engineer_features(df):
             "rolling_avg_1d",
             "rolling_avg_7d",
             "lag_1h",
-            "lag_24h"
+            "lag_24h",
         ).orderBy("node_id", "timestamp").limit(5).show(truncate=False)
 
         return df_features
@@ -450,7 +460,7 @@ def write_features(df, spark: SparkSession) -> bool:
         ).save()
 
         row_count = df.count()
-        logger.info(f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}")#
+        logger.info(f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}")  #
 
         return True
 
