@@ -294,7 +294,7 @@ def evaluate_and_promote(**context):
             key='lstm_metrics'
         )
         
-        logger.info(f"New LSTM metrics:")
+        logger.info("New LSTM metrics:")
         logger.info(f"   RMSE: {lstm_metrics['rmse']:.4f}")
         logger.info(f"   MAPE: {lstm_metrics['mape']:.4f}")
         
