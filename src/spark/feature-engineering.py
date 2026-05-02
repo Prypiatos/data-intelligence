@@ -26,7 +26,8 @@ import logging
 # ============================================
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -48,13 +49,15 @@ class Config:
     POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
     # Security: SSL/TLS for database connections
-    POSTGRES_SSL_MODE = os.getenv(
-        "POSTGRES_SSL_MODE", "require"
-    )  # require, disable, allow, prefer
+    POSTGRES_SSL_MODE = os.getenv("POSTGRES_SSL_MODE", "require")
+    # Options: require, disable, allow, prefer
 
     @staticmethod
     def validate_postgres_config():
-        """Validate PostgreSQL configuration. Raises error if required vars are missing."""
+        """Validate PostgreSQL configuration.
+
+        Raises error if required vars are missing.
+        """
         required_vars = ["POSTGRES_USER", "POSTGRES_PASSWORD"]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
 
@@ -70,11 +73,16 @@ class Config:
         logger.info("✅ PostgreSQL configuration validated")
 
     # Tables (PostgreSQL schema)
-    RAW_TABLE = "telemetry_readings"  # Source: raw telemetry with voltage, current, power
-    NODE_METADATA_TABLE = "node_metadata"  # Source: node type and location info
-    HOURLY_TABLE = "hourly_energy_readings"  # Intermediate: aggregated to hourly
-    FEATURES_TABLE = "energy_features"  # Output: engineered features
-    FORECASTS_TABLE = "forecasts"  # Output: forecast predictions
+    # Source: raw telemetry with voltage, current, power
+    RAW_TABLE = "telemetry_readings"
+    # Source: node type and location info
+    NODE_METADATA_TABLE = "node_metadata"
+    # Intermediate: aggregated to hourly
+    HOURLY_TABLE = "hourly_energy_readings"
+    # Output: engineered features
+    FEATURES_TABLE = "energy_features"
+    # Output: forecast predictions
+    FORECASTS_TABLE = "forecasts"
 
     # Spark Configuration
     SPARK_MASTER = os.getenv("SPARK_MASTER", "local")
@@ -83,9 +91,12 @@ class Config:
 
     # Data Sampling (0.5Hz means 1 reading every 2 seconds)
     SAMPLING_RATE_HZ = 0.5
-    READINGS_PER_HOUR = int(3600 / (1 / SAMPLING_RATE_HZ))  # 7,200 readings per hour
-    READINGS_PER_DAY = READINGS_PER_HOUR * 24  # 172,800 readings per day
-    READINGS_PER_WEEK = READINGS_PER_DAY * 7  # 1,209,600 readings per week
+    # 7,200 readings per hour
+    READINGS_PER_HOUR = int(3600 / (1 / SAMPLING_RATE_HZ))
+    # 172,800 readings per day
+    READINGS_PER_DAY = READINGS_PER_HOUR * 24
+    # 1,209,600 readings per week
+    READINGS_PER_WEEK = READINGS_PER_DAY * 7
 
     # Feature Windows (in terms of readings, not hours)
     LAG_READINGS = {
@@ -100,10 +111,15 @@ class Config:
     @staticmethod
     def get_jdbc_url():
         """Get PostgreSQL JDBC connection URL with SSL/TLS support."""
-        jdbc_url = f"jdbc:postgresql://{Config.POSTGRES_HOST}:{Config.POSTGRES_PORT}/{Config.POSTGRES_DB}"
+        jdbc_url = (
+            f"jdbc:postgresql://{Config.POSTGRES_HOST}:"
+            f"{Config.POSTGRES_PORT}/{Config.POSTGRES_DB}"
+        )
 
         # Add SSL parameters for secure connections
-        ssl_params = f"?sslmode={Config.POSTGRES_SSL_MODE}&connectTimeout=30"
+        ssl_params = (
+            f"?sslmode={Config.POSTGRES_SSL_MODE}&connectTimeout=30"
+        )
 
         return jdbc_url + ssl_params
 
@@ -143,10 +159,11 @@ def create_spark_session() -> SparkSession:
 
 
 def read_raw_data(spark):
-    """
-    Read raw telemetry data from PostgreSQL.
-    
-    Returns a DataFrame with columns: node_id, timestamp, voltage, current, power, energy_wh
+    """Read raw telemetry data from PostgreSQL.
+
+    Returns:
+        DataFrame with columns: node_id, timestamp, voltage, current,
+        power, energy_wh
     """
     try:
         logger.info("=" * 80)
@@ -167,7 +184,8 @@ def read_raw_data(spark):
         row_count = df.count()
         logger.info(f"✅ Read {row_count:,} rows from {Config.RAW_TABLE}")
         logger.info("   Sampling rate: 0.5Hz (1 reading every 2 seconds)")
-        logger.info(f"   Approximate duration: {row_count / Config.READINGS_PER_HOUR:.1f} hours")
+        duration_hours = row_count / Config.READINGS_PER_HOUR
+        logger.info(f"   Approximate duration: {duration_hours:.1f} hours")
 
         # Show sample
         logger.info("Sample raw data (0.5Hz):")
@@ -205,7 +223,8 @@ def aggregate_to_hourly(df):
     logger.info("Aggregating telemetry data to hourly by node...")
 
     try:
-        # Convert Unix timestamp (ms) to seconds if needed, then to datetime for hour bucketing
+        # Convert Unix timestamp (ms) to seconds if needed,
+        # then to datetime for hour bucketing
         df_with_dt = df.withColumn(
             "dt", to_timestamp(col("timestamp") / 1000)  # Convert ms to seconds
         )
@@ -245,9 +264,13 @@ def aggregate_to_hourly(df):
         )
 
         hourly_count = hourly_df.count()
-        logger.info(f"✅ Aggregated to {hourly_count:,} hourly readings by node")
-        logger.info(f"   Original readings: {df.count():,}")
-        logger.info(f"   Reduction ratio: {df.count() / hourly_count:.0f}:1")
+        original_count = df.count()
+        logger.info(
+            f"✅ Aggregated to {hourly_count:,} hourly readings by node"
+        )
+        logger.info(f"   Original readings: {original_count:,}")
+        reduction_ratio = original_count / hourly_count
+        logger.info(f"   Reduction ratio: {reduction_ratio:.0f}:1")
         
         # Show sample by node
         logger.info("Sample hourly data (by node):")
@@ -265,14 +288,14 @@ def aggregate_to_hourly(df):
 
 
 def engineer_features(df):
-    """
-    Create engineered features from hourly aggregated data by node.
+    """Create engineered features from hourly aggregated data by node.
 
     Features:
-    - Time features: hour, day_of_week, day_of_month
-    - Lag features: lag_1h, lag_24h, lag_168h (based on hourly data, per node)
-    - Rolling averages: 1-day, 7-day, 30-day (in hours, per node)
-    - Rolling statistics: min, max, std (24-hour window, per node)
+        - Time features: hour, day_of_week, day_of_month
+        - Lag features: lag_1h, lag_24h, lag_168h
+          (based on hourly data, per node)
+        - Rolling averages: 1-day, 7-day, 30-day (in hours, per node)
+        - Rolling statistics: min, max, std (24-hour window, per node)
 
     Returns:
         DataFrame with engineered features grouped by node_id
@@ -299,9 +322,11 @@ def engineer_features(df):
         # ============================================
         
         logger.info("  Creating lag features (per node)...")
-        
+
         # Window specification: order by timestamp within each node
-        window_spec = Window.partitionBy("node_id").orderBy("timestamp")
+        window_spec = (
+            Window.partitionBy("node_id").orderBy("timestamp")
+        )
         df_with_lags = df_with_time
 
         # lag_1h: power from 1 hour ago (1 row back)
@@ -318,7 +343,7 @@ def engineer_features(df):
 
         # lag_168h: power from 168 hours ago / 1 week ago (168 rows back)
         df_with_lags = df_with_lags.withColumn(
-            "lag_168h", lag(col("avg_power"), 168).over(window_spec)
+            "lag_168h", lag(col("avg_power"), 168).over(window_spec),
         )
         logger.info("    Created lag_168h")
 
@@ -331,18 +356,24 @@ def engineer_features(df):
         logger.info("  Creating rolling window features (per node)...")
 
         # 24-hour window - partitioned by node, ordered by timestamp
-        window_24h = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -24 * 3600, 0  # -24 hours in seconds
+        window_24h = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-24 * 3600, 0)  # -24 hours in seconds
         )
 
         # 7-day window - partitioned by node, ordered by timestamp
-        window_7d = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -7 * 24 * 3600, 0  # -7 days in seconds
+        window_7d = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-7 * 24 * 3600, 0)  # -7 days in seconds
         )
 
         # 30-day window - partitioned by node, ordered by timestamp
-        window_30d = Window.partitionBy("node_id").orderBy("timestamp").rangeBetween(
-            -30 * 24 * 3600, 0  # -30 days in seconds
+        window_30d = (
+            Window.partitionBy("node_id")
+            .orderBy("timestamp")
+            .rangeBetween(-30 * 24 * 3600, 0)  # -30 days in seconds
         )
 
         df_with_rolling = (
@@ -376,7 +407,9 @@ def engineer_features(df):
         logger.info("✅ Feature engineering complete")
 
         # Show sample
-        logger.info("Sample engineered features (from hourly data, by node):")
+        logger.info(
+            "Sample engineered features (from hourly data, by node):"
+        )
         df_features.select(
             "node_id",
             "timestamp",
@@ -386,7 +419,7 @@ def engineer_features(df):
             "rolling_avg_1d",
             "rolling_avg_7d",
             "lag_1h",
-            "lag_24h"
+            "lag_24h",
         ).orderBy("node_id", "timestamp").limit(5).show(truncate=False)
 
         return df_features
@@ -411,12 +444,16 @@ def validate_features(df) -> bool:
         for col_name in critical_cols:
             null_count = df.filter(col(col_name).isNull()).count()
             if null_count > 0:
-                logger.warning(f"  ⚠️  {null_count} null values in {col_name}")
+                logger.warning(
+                    f"  ⚠️  {null_count} null values in {col_name}"
+                )
 
         # Check for negative power
         negative_count = df.filter(col("avg_power") < 0).count()
         if negative_count > 0:
-            logger.warning(f"  ⚠️  {negative_count} negative power values")
+            logger.warning(
+                f"  ⚠️  {negative_count} negative power values"
+            )
 
         row_count = df.count()
         logger.info(f"  ✅ Total rows: {row_count:,}")
@@ -439,18 +476,21 @@ def write_features(df, spark: SparkSession) -> bool:
     logger.info(f"Writing features to {Config.FEATURES_TABLE}...")
 
     try:
-        df.write.format("jdbc").option("url", Config.get_jdbc_url()).option(
-            "dbtable", Config.FEATURES_TABLE
-        ).option("user", Config.POSTGRES_USER).option(
-            "password", Config.POSTGRES_PASSWORD
-        ).option(
-            "driver", "org.postgresql.Driver"
-        ).mode(
-            "overwrite"
-        ).save()
+        (
+            df.write.format("jdbc")
+            .option("url", Config.get_jdbc_url())
+            .option("dbtable", Config.FEATURES_TABLE)
+            .option("user", Config.POSTGRES_USER)
+            .option("password", Config.POSTGRES_PASSWORD)
+            .option("driver", "org.postgresql.Driver")
+            .mode("overwrite")
+            .save()
+        )
 
         row_count = df.count()
-        logger.info(f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}")#
+        logger.info(
+            f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}"
+        )
 
         return True
 
@@ -502,7 +542,9 @@ def run_feature_engineering_pipeline():
             logger.info("✅ Pipeline completed successfully!")
             logger.info(f"   Duration: {duration:.2f} seconds")
             logger.info(f"   Features table: {Config.FEATURES_TABLE}")
-            logger.info("   Aggregation: 0.5Hz → Hourly → Features")
+            logger.info(
+                "   Aggregation: 0.5Hz → Hourly → Features"
+            )
             logger.info("=" * 80)
 
             return True
