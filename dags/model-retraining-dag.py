@@ -71,10 +71,16 @@ def fetch_training_data(**context):
         from sqlalchemy import create_engine
         
         # Create database connection
-        connection_string = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+        connection_string = (
+            f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@"
+            f"{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+        )
         engine = create_engine(connection_string)
         
-        logger.info(f"Connecting to PostgreSQL: {POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}")
+        logger.info(
+            f"Connecting to PostgreSQL: "
+            f"{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+        )
         
         # Fetch features from last LOOKBACK_DAYS
         query = f"""
@@ -129,7 +135,10 @@ def retrain_lstm_model(**context):
         
         # Get training data from previous task
         ti = context['task_instance']
-        data_path = ti.xcom_pull(task_ids='fetch_training_data', key='training_data_path')
+        data_path = ti.xcom_pull(
+            task_ids='fetch_training_data',
+            key='training_data_path'
+        )
         
         logger.info(f"Loading training data from {data_path}")
         df = pd.read_csv(data_path)
@@ -139,7 +148,8 @@ def retrain_lstm_model(**context):
         mlflow.set_experiment(MLFLOW_FORECASTING_EXPERIMENT)
         
         # Start MLflow run
-        with mlflow.start_run(run_name=f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"):
+        run_name = f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        with mlflow.start_run(run_name=run_name):
             
             logger.info("Preparing data...")
             # Use avg_power as target
@@ -169,7 +179,9 @@ def retrain_lstm_model(**context):
             # Import LSTM model
             from src.models.forecasting.lstm_model import LSTMForecaster
             
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            device = torch.device(
+                'cuda' if torch.cuda.is_available() else 'cpu'
+            )
             model = LSTMForecaster(
                 input_size=1,
                 hidden_size=64,
@@ -177,7 +189,9 @@ def retrain_lstm_model(**context):
                 output_size=24
             ).to(device)
             
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=0.001
+            )
             loss_fn = torch.nn.MSELoss()
             
             # Training loop
@@ -188,8 +202,12 @@ def retrain_lstm_model(**context):
                 # Simple batch training
                 batch_size = 32
                 for i in range(0, len(train_data) - 24, batch_size):
-                    X = torch.FloatTensor(train_data[i:i+batch_size]).unsqueeze(1).to(device)
-                    y = torch.FloatTensor(train_data[i+batch_size:i+batch_size+24]).to(device)
+                    X = torch.FloatTensor(
+                        train_data[i:i+batch_size]
+                    ).unsqueeze(1).to(device)
+                    y = torch.FloatTensor(
+                        train_data[i+batch_size:i+batch_size+24]
+                    ).to(device)
                     
                     output = model(X)
                     loss = loss_fn(output, y)
@@ -216,9 +234,13 @@ def retrain_lstm_model(**context):
                 test_input = torch.FloatTensor(test_data).unsqueeze(1).to(device)
                 test_output = model(test_input).cpu().numpy()
             
-            test_loss = np.mean((test_output - test_data[24:24+len(test_output)]) ** 2)
+            test_indices = slice(24, 24 + len(test_output))
+            test_truth = test_data[test_indices]
+            test_loss = np.mean((test_output - test_truth) ** 2)
             test_rmse = np.sqrt(test_loss)
-            test_mape = np.mean(np.abs((test_data[24:24+len(test_output)] - test_output) / test_data[24:24+len(test_output)]))
+            test_mape = np.mean(
+                np.abs((test_truth - test_output) / test_truth)
+            )
             
             logger.info(f"✅ Test RMSE: {test_rmse:.4f}")
             logger.info(f"✅ Test MAPE: {test_mape:.4f}")
@@ -238,7 +260,10 @@ def retrain_lstm_model(**context):
             # Push metrics to XCom for comparison
             context['task_instance'].xcom_push(
                 key='lstm_metrics',
-                value={'rmse': float(test_rmse), 'mape': float(test_mape)}
+                value={
+                    'rmse': float(test_rmse),
+                    'mape': float(test_mape)
+                }
             )
             
             logger.info("✅ LSTM retraining complete!")
@@ -264,7 +289,10 @@ def evaluate_and_promote(**context):
         
         # Get metrics from LSTM training
         ti = context['task_instance']
-        lstm_metrics = ti.xcom_pull(task_ids='retrain_lstm_model', key='lstm_metrics')
+        lstm_metrics = ti.xcom_pull(
+            task_ids='retrain_lstm_model',
+            key='lstm_metrics'
+        )
         
         logger.info(f"New LSTM metrics:")
         logger.info(f"   RMSE: {lstm_metrics['rmse']:.4f}")
@@ -279,7 +307,7 @@ def evaluate_and_promote(**context):
         if experiment:
             runs = mlflow.search_runs(
                 experiment_ids=[experiment.experiment_id],
-                order_by=["metrics.test_mape ASC"],
+                order_by=['metrics.test_mape ASC'],
                 max_results=5
             )
             
@@ -288,10 +316,15 @@ def evaluate_and_promote(**context):
                 logger.info(f"Previous best MAPE: {previous_best_mape:.4f}")
                 
                 if lstm_metrics['mape'] < previous_best_mape:
-                    logger.info("✅ New model is BETTER! Promoting to production...")
+                    logger.info(
+                        "✅ New model is BETTER! Promoting to production..."
+                    )
                     # Promotion logic here
                 else:
-                    logger.info(f"⚠️  New model MAPE ({lstm_metrics['mape']:.4f}) is worse than previous ({previous_best_mape:.4f})")
+                    logger.info(
+                        f"⚠️  New model MAPE ({lstm_metrics['mape']:.4f}) "
+                        f"is worse than previous ({previous_best_mape:.4f})"
+                    )
         
         logger.info("✅ Evaluation complete!")
         return {"status": "success", "promoted": True}
@@ -318,7 +351,7 @@ default_args = {
 dag = DAG(
     'model_retraining_pipeline',
     default_args=default_args,
-    description='Retrain LSTM forecasting and anomaly detection models weekly',
+    description='Retrain LSTM forecasting and anomaly detection models weekly',  # noqa: E501
     schedule_interval='0 2 * * 1',  # Monday at 2 AM
     catchup=False,
     tags=['E2', 'ML', 'retraining'],
@@ -352,7 +385,7 @@ evaluate_task = PythonOperator(
     dag=dag,
 )
 
-# Task 4: Cleanup (optional)mod
+# Task 4: Cleanup (optional)
 cleanup_task = BashOperator(
     task_id='cleanup',
     bash_command='rm -f /tmp/training_data.csv',
