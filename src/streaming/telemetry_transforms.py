@@ -1,6 +1,6 @@
 import json
 
-from pyflink.common import Time, WatermarkStrategy
+from pyflink.common import Duration, Time, WatermarkStrategy
 from pyflink.datastream.functions import ProcessWindowFunction
 from pyflink.datastream.window import TumblingEventTimeWindows
 from pyflink.common.watermark_strategy import TimestampAssigner
@@ -12,7 +12,26 @@ WINDOW_SIZE_MS = 2000
 
 def validate_message(value):
     """Validate one telemetry message."""
-    payload = json.loads(value)
+
+    if not value or value.strip() == "":
+        return json.dumps(
+            {
+                "status": "invalid",
+                "reason": "Empty message",
+                "data": None,
+            }
+        )
+    try: 
+        payload = json.loads(value)
+    except json.JSONDecodeError:
+        return json.dumps(
+            {
+                "status": "invalid",
+                "reason": "Invalid JSON",
+                "data": None,
+            }
+        )
+    
     is_valid, message = validate_telemetry(payload)
 
     return json.dumps(
@@ -49,10 +68,11 @@ class TelemetryTimestampAssigner(TimestampAssigner):
 def assign_event_time(stream):
     """Assign event time stamps to the stream based on the 'timestamp' field in telemetry records."""
     watermark_strategy = (
-        WatermarkStrategy.for_monotonous_timestamps().with_timestamp_assigner(
-            TelemetryTimestampAssigner()
-        )
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(5))
+        .with_timestamp_assigner(TelemetryTimestampAssigner())
     )
+
     return stream.assign_timestamps_and_watermarks(watermark_strategy)
 
 
