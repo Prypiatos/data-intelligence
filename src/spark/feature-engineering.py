@@ -117,9 +117,7 @@ class Config:
         )
 
         # Add SSL parameters for secure connections
-        ssl_params = (
-            f"?sslmode={Config.POSTGRES_SSL_MODE}&connectTimeout=30"
-        )
+        ssl_params = f"?sslmode={Config.POSTGRES_SSL_MODE}&connectTimeout=30"
 
         return jdbc_url + ssl_params
 
@@ -265,13 +263,11 @@ def aggregate_to_hourly(df):
 
         hourly_count = hourly_df.count()
         original_count = df.count()
-        logger.info(
-            f"✅ Aggregated to {hourly_count:,} hourly readings by node"
-        )
+        logger.info(f"✅ Aggregated to {hourly_count:,} hourly readings by node")
         logger.info(f"   Original readings: {original_count:,}")
         reduction_ratio = original_count / hourly_count
         logger.info(f"   Reduction ratio: {reduction_ratio:.0f}:1")
-        
+
         # Show sample by node
         logger.info("Sample hourly data (by node):")
         hourly_df.orderBy("node_id", "timestamp").limit(5).show(truncate=False)
@@ -320,13 +316,11 @@ def engineer_features(df):
         # ============================================
         # 2. Lag Features (on hourly data, per node)
         # ============================================
-        
+
         logger.info("  Creating lag features (per node)...")
 
         # Window specification: order by timestamp within each node
-        window_spec = (
-            Window.partitionBy("node_id").orderBy("timestamp")
-        )
+        window_spec = Window.partitionBy("node_id").orderBy("timestamp")
         df_with_lags = df_with_time
 
         # lag_1h: power from 1 hour ago (1 row back)
@@ -343,7 +337,8 @@ def engineer_features(df):
 
         # lag_168h: power from 168 hours ago / 1 week ago (168 rows back)
         df_with_lags = df_with_lags.withColumn(
-            "lag_168h", lag(col("avg_power"), 168).over(window_spec),
+            "lag_168h",
+            lag(col("avg_power"), 168).over(window_spec),
         )
         logger.info("    Created lag_168h")
 
@@ -407,9 +402,7 @@ def engineer_features(df):
         logger.info("✅ Feature engineering complete")
 
         # Show sample
-        logger.info(
-            "Sample engineered features (from hourly data, by node):"
-        )
+        logger.info("Sample engineered features (from hourly data, by node):")
         df_features.select(
             "node_id",
             "timestamp",
@@ -444,16 +437,12 @@ def validate_features(df) -> bool:
         for col_name in critical_cols:
             null_count = df.filter(col(col_name).isNull()).count()
             if null_count > 0:
-                logger.warning(
-                    f"  ⚠️  {null_count} null values in {col_name}"
-                )
+                logger.warning(f"  ⚠️  {null_count} null values in {col_name}")
 
         # Check for negative power
         negative_count = df.filter(col("avg_power") < 0).count()
         if negative_count > 0:
-            logger.warning(
-                f"  ⚠️  {negative_count} negative power values"
-            )
+            logger.warning(f"  ⚠️  {negative_count} negative power values")
 
         row_count = df.count()
         logger.info(f"  ✅ Total rows: {row_count:,}")
@@ -488,9 +477,7 @@ def write_features(df, spark: SparkSession) -> bool:
         )
 
         row_count = df.count()
-        logger.info(
-            f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}"
-        )
+        logger.info(f"✅ Wrote {row_count:,} rows to {Config.FEATURES_TABLE}")
 
         return True
 
@@ -542,9 +529,7 @@ def run_feature_engineering_pipeline():
             logger.info("✅ Pipeline completed successfully!")
             logger.info(f"   Duration: {duration:.2f} seconds")
             logger.info(f"   Features table: {Config.FEATURES_TABLE}")
-            logger.info(
-                "   Aggregation: 0.5Hz → Hourly → Features"
-            )
+            logger.info("   Aggregation: 0.5Hz → Hourly → Features")
             logger.info("=" * 80)
 
             return True
