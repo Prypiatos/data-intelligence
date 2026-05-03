@@ -1,14 +1,15 @@
 import logging
-from datetime import datetime
+import pendulum
 
 from airflow.decorators import dag, task
 
 from src.validation.postgres_batch_validator import validate_telemetry_batch
 
+
 @dag(
-    dag_id = "data_validation_dag",
+    dag_id="data_validation_dag",
     schedule="@daily",
-    start_date=datetime(2026, 1, 1),
+    start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     catchup=False,
     tags=["validation", "great-expectations"],
 )
@@ -23,11 +24,10 @@ def data_validation_dag():
 
         logging.info("Validation summary: %s", summary)
 
-        if summary["failed"] >0:
+        if summary["failed"] > 0:
             raise ValueError(f"Telemetry validation failed: {summary}")
-        
+
         return summary
-    
 
     validate_latest_interval()
 
