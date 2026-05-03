@@ -88,7 +88,7 @@ def fetch_forecasts(engine=None) -> pd.DataFrame:
 
 
 def _anomaly_recommendations(anomalies: pd.DataFrame) -> list[Recommendation]:
-    recs = []
+    recs: list[Recommendation] = []
     if anomalies.empty:
         return recs
 
@@ -119,7 +119,7 @@ def _anomaly_recommendations(anomalies: pd.DataFrame) -> list[Recommendation]:
 
 
 def _load_shift_recommendations(forecasts: pd.DataFrame) -> list[Recommendation]:
-    recs = []
+    recs: list[Recommendation] = []
     if forecasts.empty:
         return recs
 
@@ -161,7 +161,7 @@ def _load_shift_recommendations(forecasts: pd.DataFrame) -> list[Recommendation]
 
 
 def _high_consumption_recommendations(forecasts: pd.DataFrame) -> list[Recommendation]:
-    recs = []
+    recs: list[Recommendation] = []
     if forecasts.empty:
         return recs
 
