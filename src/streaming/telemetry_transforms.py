@@ -67,10 +67,9 @@ class TelemetryTimestampAssigner(TimestampAssigner):
 
 def assign_event_time(stream):
     """Assign event time stamps to the stream based on the 'timestamp' field in telemetry records."""
-    watermark_strategy = (
-        WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(5))
-        .with_timestamp_assigner(TelemetryTimestampAssigner())
-    )
+    watermark_strategy = WatermarkStrategy.for_bounded_out_of_orderness(
+        Duration.of_seconds(5)
+    ).with_timestamp_assigner(TelemetryTimestampAssigner())
 
     return stream.assign_timestamps_and_watermarks(watermark_strategy)
 
