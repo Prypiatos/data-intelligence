@@ -238,6 +238,33 @@ class TestEdgeCases:
         results = detector.predict([reading])
         assert len(results) == 1
 
+    def test_missing_field_raises(self):
+        """A reading missing a required feature column should raise KeyError."""
+        detector = _fitted_detector()
+        incomplete = {
+            "node_id": "plug-01",
+            "timestamp": 1,
+            "voltage": 230.0,
+            "current": 2.0,
+            # missing: power, energy_wh
+        }
+        with pytest.raises(KeyError):
+            detector.predict([incomplete])
+
+    def test_null_value_does_not_crash(self):
+        """A None value in a numeric field should not raise — NaN propagates silently."""
+        detector = _fitted_detector()
+        reading = {
+            "node_id": "plug-01",
+            "timestamp": 1,
+            "voltage": None,
+            "current": 2.0,
+            "power": 450.0,
+            "energy_wh": 7.5,
+        }
+        results = detector.predict([reading])
+        assert len(results) == 1
+
 
 # ---------------------------------------------------------------------------
 # Save / load
