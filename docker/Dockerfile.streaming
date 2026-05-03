@@ -1,0 +1,22 @@
+FROM python:3.10-bullseye
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jre-headless \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.streaming.txt .
+
+RUN pip install --no-cache-dir -r requirements.streaming.txt
+
+COPY lib/flink-connector-kafka-1.17.2.jar /app/lib/
+COPY lib/kafka-clients-3.2.3.jar /app/lib/
+
+COPY src/ ./src/
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "src.streaming.flink_stream_job"]
