@@ -71,4 +71,7 @@ if __name__ == "__main__":
     mlflow.log_metric("loss", loss.item())  # type: ignore[attr-defined]
     mlflow.end_run()  # type: ignore[attr-defined]
 
+    torch.save(model, "models/lstm_model.pth")
+    print("✅ Model saved to models/lstm_model.pth")
+
     print("✅ Model trained! Check http://localhost:5000")
