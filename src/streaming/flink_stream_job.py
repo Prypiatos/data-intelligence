@@ -36,6 +36,7 @@ def build_kafka_job():
     env = build_environment()
     source = build_kafka_source()
     sink = build_kafka_sink()
+    # Kafka records are raw JSON strings here; event time is assigned after validation.
     stream = env.from_source(source, WatermarkStrategy.no_watermarks(), "kafka-source")
     validated = validate_stream(stream)
     validated.print()
