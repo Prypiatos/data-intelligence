@@ -21,6 +21,8 @@ lib/*.jar
 *.pt
 *.pth
 mlruns/
+spark-tmp/
+spark-ivy/
 
 # IDEs
 .vscode/
