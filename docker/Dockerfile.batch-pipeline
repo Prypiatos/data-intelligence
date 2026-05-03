@@ -31,7 +31,6 @@ RUN pip install --upgrade pip setuptools wheel && \
 # Copy application code
 COPY src/ ./src/
 COPY models/ ./models/
-COPY .env .env
 
 # Set Python path
 ENV PYTHONPATH=/app

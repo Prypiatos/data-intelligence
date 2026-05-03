@@ -26,7 +26,7 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
-MODEL_PATH = "models/lstm_model.pth"
+MODEL_PATH = os.getenv("MODEL_PATH", "models/lstm_model.pth")
 FORECAST_HORIZON = 24  # 24-hour forecast
 
 
@@ -249,8 +249,6 @@ def log_to_mlflow(model_path, num_predictions, forecast_horizon):
         mlflow.log_param("forecast_horizon", forecast_horizon)
         mlflow.log_metric("num_predictions", num_predictions)
         mlflow.log_metric("timestamp", int(datetime.now().timestamp()))
-
-        mlflow.log_artifact(model_path, artifact_path="model")
 
         logger.info("✅ Logged batch pipeline run to MLflow")
 
