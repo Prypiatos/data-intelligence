@@ -85,6 +85,20 @@ Expected result shape:
 {"window_start":1712908804000,"window_end":1712908806000,"record_count":1}
 ```
 
+## Run Unit Tests
+
+From the `data-intelligence` folder:
+
+```bash
+python -m pytest tests/unit/test-streaming.py -v
+```
+
+To run streaming tests together with the validation tests:
+
+```bash
+python -m pytest tests/unit/test-streaming.py tests/unit/test-validation.py -v
+```
+
 ## Event Time
 
 Telemetry `timestamp` values are epoch milliseconds.
