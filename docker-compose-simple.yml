@@ -20,6 +20,30 @@ services:
     networks:
       - energy_network
 
+  batch-pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.batch-pipeline
+    container_name: energy-batch-pipeline
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: energy_db
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      LOG_LEVEL: INFO
+    networks:
+      - energy_network
+    restart: on-failure    
+
   spark-master:
     image: apache/spark:3.5.1
     container_name: energy-spark
@@ -35,12 +59,14 @@ services:
       - postgres
   
     restart: unless-stopped
+    networks:
+      - energy_network
 
   mlflow:
     image: python:3.11
     container_name: energy-mlflow
     working_dir: /app
-    command: bash -c "pip install mlflow && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://postgres:postgres@postgres:5432/mlflow --default-artifact-root /mlflow/artifacts"
+    command: bash -c "pip install mlflow psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://postgres:postgres@postgres:5432/mlflow --default-artifact-root /mlflow/artifacts"
     depends_on:
       postgres:
         condition: service_healthy

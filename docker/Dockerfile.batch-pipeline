@@ -1,0 +1,44 @@
+# ============================================
+# Dockerfile for Batch Pipeline
+# ============================================
+# LSTM Forecasting Batch Processing
+
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY requirements_batch_pipeline.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements_batch_pipeline.txt
+
+# Copy application code
+COPY src/ ./src/
+COPY models/ ./models/
+COPY .env .env
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# Run batch pipeline
+CMD ["python", "src/models/forecasting/batch_pipeline.py"]
