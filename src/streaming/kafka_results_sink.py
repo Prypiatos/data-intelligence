@@ -1,3 +1,5 @@
+import os
+
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors.kafka import (
     KafkaRecordSerializationSchema,
@@ -7,9 +9,11 @@ from pyflink.datastream.connectors.kafka import (
 
 def build_kafka_sink():
     """Build the Kafka sink for processed telemetry summaries."""
+    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
     return (
         KafkaSink.builder()
-        .set_bootstrap_servers("localhost:9092")
+        .set_bootstrap_servers(bootstrap_servers)
         .set_record_serializer(
             KafkaRecordSerializationSchema.builder()
             .set_topic("energy.telemetry.results")
