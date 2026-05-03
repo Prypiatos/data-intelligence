@@ -17,6 +17,7 @@ sys.modules["influx_writer"] = mock_influx_writer
 from kafka_consumer import process_telemetry
 from validator import validate_telemetry
 
+
 def valid_telemetry():
     return {
         "node_id": "plug_01",
