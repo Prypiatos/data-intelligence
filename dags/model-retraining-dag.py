@@ -5,11 +5,10 @@ Task 3: Scheduled pipeline to retrain both ML models on new data
 This Airflow DAG:
 1. Runs every Monday at 2 AM
 2. Fetches latest energy data from PostgreSQL
-3. Retrains LSTM forecasting model
-4. Retrains anomaly detection model
-5. Evaluates both models
+3. Retrains LSTM forecasting model  } in parallel
+4. Retrains anomaly detection model }
+5. Evaluates both models and promotes to production if metrics improve
 6. Logs results to MLflow
-7. Promotes best model to production if metrics improve
 
 Dependencies:
 - Task #12: Load forecasting model baseline
@@ -20,323 +19,321 @@ Dependencies:
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
-from airflow.utils.dates import days_ago
 from datetime import datetime, timedelta
 import logging
 import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-# ============================================
-# Configuration
-# ============================================
 
 logger = logging.getLogger(__name__)
 
-# PostgreSQL Configuration
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
-# MLflow Configuration
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_FORECASTING_EXPERIMENT = "load-forecasting"
 MLFLOW_ANOMALY_EXPERIMENT = "anomaly-detection"
 
-# Data Configuration
-LOOKBACK_DAYS = 90  # Use last 90 days of data for training
-TEST_SPLIT = 0.2  # 20% test, 80% train
-
-# ============================================
-# Python Functions (Tasks)
-# ============================================
+LOOKBACK_DAYS = 90
+TEST_SPLIT = 0.2
+SEQ_LEN = 24  # LSTM input sequence length
 
 
 def fetch_training_data(**context):
-    """
-    Fetch latest energy data from PostgreSQL.
+    """Fetch energy_features and telemetry_readings from PostgreSQL."""
+    logger.info("Task 1: Fetching Training Data")
 
-    Retrieves energy_features table from the last LOOKBACK_DAYS.
-    Returns: training and test data splits.
-    """
-    logger.info("=" * 80)
-    logger.info("📖 Task 1: Fetching Training Data")
-    logger.info("=" * 80)
+    import pandas as pd
+    from sqlalchemy import create_engine
 
-    try:
-        import pandas as pd
-        from sqlalchemy import create_engine
+    connection_string = (
+        f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@"
+        f"{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    )
+    engine = create_engine(connection_string)
 
-        # Create database connection
-        connection_string = (
-            f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@"
-            f"{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-        )
-        engine = create_engine(connection_string)
-
-        logger.info(
-            f"Connecting to PostgreSQL: "
-            f"{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-        )
-
-        # Fetch features from last LOOKBACK_DAYS
-        query = f"""
+    features_df = pd.read_sql(
+        f"""
         SELECT *
         FROM energy_features
         WHERE timestamp >= NOW() - INTERVAL '{LOOKBACK_DAYS} days'
         ORDER BY node_id, timestamp
-        """
+        """,
+        engine,
+    )
+    logger.info(f"Fetched {len(features_df):,} rows from energy_features")
 
-        df = pd.read_sql(query, engine)
-        logger.info(f"✅ Fetched {len(df):,} rows from energy_features")
-        logger.info(
-            f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}"
-        )
-        logger.info(f"   Nodes: {df['node_id'].nunique()}")
+    telemetry_df = pd.read_sql(
+        f"""
+        SELECT node_id, timestamp, voltage, current, power, energy_wh
+        FROM telemetry_readings
+        WHERE timestamp >= NOW() - INTERVAL '{LOOKBACK_DAYS} days'
+        ORDER BY timestamp
+        """,
+        engine,
+    )
+    logger.info(f"Fetched {len(telemetry_df):,} rows from telemetry_readings")
 
-        # Save to temporary file for next tasks
-        temp_file = "/tmp/training_data.csv"
-        df.to_csv(temp_file, index=False)
-        logger.info(f"✅ Saved training data to {temp_file}")
+    features_path = "/tmp/training_features.csv"
+    telemetry_path = "/tmp/training_telemetry.csv"
+    features_df.to_csv(features_path, index=False)
+    telemetry_df.to_csv(telemetry_path, index=False)
 
-        # Push to XCom for other tasks to access
-        context["task_instance"].xcom_push(key="training_data_path", value=temp_file)
-        context["task_instance"].xcom_push(key="data_rows", value=len(df))
+    ti = context["task_instance"]
+    ti.xcom_push(key="features_path", value=features_path)
+    ti.xcom_push(key="telemetry_path", value=telemetry_path)
 
-        return {"status": "success", "rows": len(df)}
-
-    except Exception as e:
-        logger.error(f"❌ Failed to fetch training data: {str(e)}")
-        raise
+    return {
+        "status": "success",
+        "feature_rows": len(features_df),
+        "telemetry_rows": len(telemetry_df),
+    }
 
 
 def retrain_lstm_model(**context):
-    """
-    Retrain LSTM forecasting model with latest data.
+    """Retrain LSTM forecasting model, log to MLflow, register if better."""
+    logger.info("Task 2: Retraining LSTM Model")
 
-    Steps:
-    1. Load training data
-    2. Train LSTM model
-    3. Evaluate on test set
-    4. Log metrics to MLflow
-    5. Save model
-    """
-    logger.info("=" * 80)
-    logger.info("🏋️  Task 2: Retraining LSTM Model")
-    logger.info("=" * 80)
+    import numpy as np
+    import torch
+    import mlflow
+    import mlflow.pytorch
+    import pandas as pd
+    from sklearn.preprocessing import MinMaxScaler
 
-    try:
-        import pandas as pd
-        import torch
-        from sklearn.preprocessing import MinMaxScaler
-        import mlflow
-        import numpy as np
+    from src.models.forecasting.lstm_model import LSTMForecaster
 
-        # Get training data from previous task
-        ti = context["task_instance"]
-        data_path = ti.xcom_pull(
-            task_ids="fetch_training_data", key="training_data_path"
+    ti = context["task_instance"]
+    features_path = ti.xcom_pull(task_ids="fetch_training_data", key="features_path")
+
+    df = pd.read_csv(features_path)
+    data = df[["avg_power"]].values
+
+    scaler = MinMaxScaler()
+    scaled = scaler.fit_transform(data)
+
+    train_size = int(len(scaled) * (1 - TEST_SPLIT))
+    train_data = scaled[:train_size]
+    test_data = scaled[train_size:]
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_FORECASTING_EXPERIMENT)
+
+    run_name = f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    with mlflow.start_run(run_name=run_name) as run:
+        mlflow.log_params(
+            {
+                "model_type": "LSTM",
+                "epochs": 50,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "seq_len": SEQ_LEN,
+                "lookback_days": LOOKBACK_DAYS,
+                "training_samples": len(train_data),
+            }
         )
 
-        logger.info(f"Loading training data from {data_path}")
-        df = pd.read_csv(data_path)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = LSTMForecaster().to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        loss_fn = torch.nn.MSELoss()
 
-        # Set MLflow tracking
-        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-        mlflow.set_experiment(MLFLOW_FORECASTING_EXPERIMENT)
+        for epoch in range(50):
+            model.train()
+            epoch_loss = 0.0
+            n_batches = 0
 
-        # Start MLflow run
-        run_name = f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        with mlflow.start_run(run_name=run_name):
-
-            logger.info("Preparing data...")
-            # Use avg_power as target
-            data = df[["avg_power"]].values
-
-            # Normalize
-            scaler = MinMaxScaler()
-            scaled_data = scaler.fit_transform(data)
-
-            # Split train/test
-            train_size = int(len(scaled_data) * (1 - TEST_SPLIT))
-            train_data = scaled_data[:train_size]
-            test_data = scaled_data[train_size:]
-
-            logger.info(
-                f"✅ Data prepared: {len(train_data)} train, {len(test_data)} test"
-            )
-
-            # Log hyperparameters
-            mlflow.log_param("model_type", "LSTM")
-            mlflow.log_param("epochs", 50)
-            mlflow.log_param("batch_size", 32)
-            mlflow.log_param("learning_rate", 0.001)
-            mlflow.log_param("hidden_size", 64)
-            mlflow.log_param("lookback_days", LOOKBACK_DAYS)
-            mlflow.log_param("training_samples", len(train_data))
-
-            logger.info("Training LSTM model...")
-            # Import LSTM model
-            from src.models.forecasting.lstm_model import LSTMForecaster
-
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            model = LSTMForecaster(
-                input_size=1, hidden_size=64, num_layers=2, output_size=24
-            ).to(device)
-
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-            loss_fn = torch.nn.MSELoss()
-
-            # Training loop
-            training_losses = []
-            for epoch in range(50):
-                epoch_loss = 0
-
-                # Simple batch training
-                batch_size = 32
-                for i in range(0, len(train_data) - 24, batch_size):
-                    X = (
-                        torch.FloatTensor(train_data[i : i + batch_size])
-                        .unsqueeze(1)
-                        .to(device)
-                    )
-                    y = torch.FloatTensor(
-                        train_data[i + batch_size : i + batch_size + 24]
-                    ).to(device)
-
-                    output = model(X)
-                    loss = loss_fn(output, y)
-
+            # Build sliding-window batches: X=(batch, seq_len, 1), y=(batch, 24)
+            batch_X, batch_y = [], []
+            for i in range(len(train_data) - SEQ_LEN - 24):
+                batch_X.append(train_data[i : i + SEQ_LEN])
+                batch_y.append(train_data[i + SEQ_LEN : i + SEQ_LEN + 24, 0])
+                if len(batch_X) == 32 or i == len(train_data) - SEQ_LEN - 25:
+                    X = torch.FloatTensor(np.array(batch_X)).to(device)
+                    y = torch.FloatTensor(np.array(batch_y)).to(device)
+                    pred = model(X)
+                    loss = loss_fn(pred, y)
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-
                     epoch_loss += loss.item()
+                    n_batches += 1
+                    batch_X, batch_y = [], []
 
-                avg_loss = epoch_loss / (len(train_data) // batch_size)
-                training_losses.append(avg_loss)
+            avg_loss = epoch_loss / max(n_batches, 1)
+            if (epoch + 1) % 10 == 0:
+                logger.info(f"Epoch {epoch+1}/50 - Loss: {avg_loss:.4f}")
+                mlflow.log_metric("train_loss", avg_loss, step=epoch)
 
-                if (epoch + 1) % 10 == 0:
-                    logger.info(f"   Epoch {epoch+1}/50 - Loss: {avg_loss:.4f}")
-                    mlflow.log_metric("train_loss", avg_loss, step=epoch)
+        # Evaluate on test set with sliding windows
+        model.eval()
+        test_preds, test_truths = [], []
+        with torch.no_grad():
+            for i in range(len(test_data) - SEQ_LEN - 24):
+                X = (
+                    torch.FloatTensor(test_data[i : i + SEQ_LEN])
+                    .unsqueeze(0)
+                    .to(device)
+                )
+                pred = model(X).cpu().numpy().flatten()
+                truth = test_data[i + SEQ_LEN : i + SEQ_LEN + 24, 0]
+                test_preds.append(pred)
+                test_truths.append(truth)
 
-            logger.info(f"✅ Training complete. Final loss: {training_losses[-1]:.4f}")
+        test_preds = np.array(test_preds)
+        test_truths = np.array(test_truths)
+        rmse = float(np.sqrt(np.mean((test_preds - test_truths) ** 2)))
+        mape = float(np.mean(np.abs((test_truths - test_preds) / (test_truths + 1e-8))))
 
-            # Evaluate on test set
-            logger.info("Evaluating on test set...")
-            model.eval()
-            with torch.no_grad():
-                test_input = torch.FloatTensor(test_data).unsqueeze(1).to(device)
-                test_output = model(test_input).cpu().numpy()
+        mlflow.log_metrics({"test_rmse": rmse, "test_mape": mape})
+        mlflow.pytorch.log_model(model, "lstm_model")
 
-            test_indices = slice(24, 24 + len(test_output))
-            test_truth = test_data[test_indices]
-            test_loss = np.mean((test_output - test_truth) ** 2)
-            test_rmse = np.sqrt(test_loss)
-            test_mape = np.mean(np.abs((test_truth - test_output) / test_truth))
+        logger.info(f"LSTM — RMSE: {rmse:.4f}, MAPE: {mape:.4f}")
 
-            logger.info(f"✅ Test RMSE: {test_rmse:.4f}")
-            logger.info(f"✅ Test MAPE: {test_mape:.4f}")
+        ti.xcom_push(key="lstm_metrics", value={"rmse": rmse, "mape": mape})
+        ti.xcom_push(key="lstm_run_id", value=run.info.run_id)
 
-            # Log metrics
-            mlflow.log_metric("test_loss", float(test_loss))
-            mlflow.log_metric("test_rmse", float(test_rmse))
-            mlflow.log_metric("test_mape", float(test_mape))
+    return {"status": "success", "rmse": rmse, "mape": mape}
 
-            # Save model
-            model_path = "models/lstm_model_retrained.pth"
-            torch.save(model.state_dict(), model_path)
-            mlflow.pytorch.log_model(model, "lstm_model")
 
-            logger.info(f"✅ Model saved to {model_path}")
+def retrain_anomaly_model(**context):
+    """Retrain IsolationForest anomaly detector on latest telemetry, log to MLflow."""
+    logger.info("Task 3: Retraining Anomaly Detection Model")
 
-            # Push metrics to XCom for comparison
-            context["task_instance"].xcom_push(
-                key="lstm_metrics",
-                value={"rmse": float(test_rmse), "mape": float(test_mape)},
-            )
+    import pandas as pd
+    import mlflow
 
-            logger.info("✅ LSTM retraining complete!")
+    from src.models.anomaly.model import AnomalyDetector
+    from src.models.anomaly.trainer import _compute_metrics
 
-            return {
-                "status": "success",
-                "rmse": float(test_rmse),
-                "mape": float(test_mape),
+    ti = context["task_instance"]
+    telemetry_path = ti.xcom_pull(task_ids="fetch_training_data", key="telemetry_path")
+
+    df = pd.read_csv(telemetry_path)
+    readings = df.to_dict(orient="records")
+    logger.info(f"Training anomaly detector on {len(readings):,} readings")
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_ANOMALY_EXPERIMENT)
+
+    run_name = f"anomaly_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    with mlflow.start_run(run_name=run_name) as run:
+        detector = AnomalyDetector(contamination=0.05, n_estimators=100)
+        detector.fit(readings)
+
+        mlflow.log_params(
+            {
+                **detector.params,
+                "n_readings": len(readings),
+                "lookback_days": LOOKBACK_DAYS,
             }
+        )
 
-    except Exception as e:
-        logger.error(f"❌ LSTM retraining failed: {str(e)}")
-        raise
+        predictions = detector.predict(readings)
+        metrics = _compute_metrics(predictions)
+        mlflow.log_metrics(metrics)
+
+        output_dir = "/tmp/anomaly_model"
+        detector.save(output_dir)
+        mlflow.log_artifact(f"{output_dir}/detector.pkl", artifact_path="model")
+
+        logger.info(
+            f"Anomaly — anomaly_rate: {metrics['anomaly_rate']:.4f}, mean_score: {metrics['mean_score']:.4f}"
+        )
+
+        ti.xcom_push(key="anomaly_metrics", value=metrics)
+        ti.xcom_push(key="anomaly_run_id", value=run.info.run_id)
+
+    return {"status": "success", **metrics}
 
 
 def evaluate_and_promote(**context):
-    """
-    Compare new model metrics with previous best.
-    Promote to production if metrics improved.
-    """
-    logger.info("=" * 80)
-    logger.info("📊 Task 3: Evaluate and Promote Model")
-    logger.info("=" * 80)
+    """Compare new models against previous best and promote to production if improved."""
+    logger.info("Task 4: Evaluate and Promote Models")
 
-    try:
-        import mlflow
+    import mlflow
+    from mlflow.tracking import MlflowClient
 
-        # Get metrics from LSTM training
-        ti = context["task_instance"]
-        lstm_metrics = ti.xcom_pull(task_ids="retrain_lstm_model", key="lstm_metrics")
+    ti = context["task_instance"]
+    lstm_metrics = ti.xcom_pull(task_ids="retrain_lstm_model", key="lstm_metrics")
+    lstm_run_id = ti.xcom_pull(task_ids="retrain_lstm_model", key="lstm_run_id")
+    anomaly_metrics = ti.xcom_pull(
+        task_ids="retrain_anomaly_model", key="anomaly_metrics"
+    )
+    anomaly_run_id = ti.xcom_pull(
+        task_ids="retrain_anomaly_model", key="anomaly_run_id"
+    )
 
-        logger.info("New LSTM metrics:")
-        logger.info(f"   RMSE: {lstm_metrics['rmse']:.4f}")
-        logger.info(f"   MAPE: {lstm_metrics['mape']:.4f}")
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    client = MlflowClient()
 
-        # Set MLflow
-        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-        mlflow.set_experiment(MLFLOW_FORECASTING_EXPERIMENT)
-
-        # Get best run from history
-        experiment = mlflow.get_experiment_by_name(MLFLOW_FORECASTING_EXPERIMENT)
-        if experiment:
-            runs = mlflow.search_runs(
-                experiment_ids=[experiment.experiment_id],
-                order_by=["metrics.test_mape ASC"],
-                max_results=5,
+    # --- LSTM promotion ---
+    lstm_promoted = False
+    experiment = mlflow.get_experiment_by_name(MLFLOW_FORECASTING_EXPERIMENT)
+    if experiment:
+        runs = mlflow.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            order_by=["metrics.test_mape ASC"],
+            max_results=10,
+        )
+        # Current run is row 0 (best MAPE); compare against row 1 (previous best)
+        if len(runs) > 1 and lstm_metrics["mape"] < runs.iloc[1]["metrics.test_mape"]:
+            mv = mlflow.register_model(
+                f"runs:/{lstm_run_id}/lstm_model", "LSTMForecaster"
+            )
+            client.set_registered_model_alias(
+                "LSTMForecaster", "production", mv.version
+            )
+            lstm_promoted = True
+            logger.info(
+                f"LSTM promoted to production (version {mv.version}, MAPE {lstm_metrics['mape']:.4f})"
+            )
+        else:
+            logger.info(
+                f"LSTM not promoted — MAPE {lstm_metrics['mape']:.4f} did not improve"
             )
 
-            if len(runs) > 1:
-                previous_best_mape = runs.iloc[1]["metrics.test_mape"]
-                logger.info(f"Previous best MAPE: {previous_best_mape:.4f}")
+    # --- Anomaly promotion ---
+    anomaly_promoted = False
+    anomaly_exp = mlflow.get_experiment_by_name(MLFLOW_ANOMALY_EXPERIMENT)
+    if anomaly_exp:
+        runs = mlflow.search_runs(
+            experiment_ids=[anomaly_exp.experiment_id],
+            order_by=["metrics.anomaly_rate ASC"],
+            max_results=10,
+        )
+        if (
+            len(runs) > 1
+            and anomaly_metrics["anomaly_rate"] < runs.iloc[1]["metrics.anomaly_rate"]
+        ):
+            mv = mlflow.register_model(
+                f"runs:/{anomaly_run_id}/model/detector.pkl", "AnomalyDetector"
+            )
+            client.set_registered_model_alias(
+                "AnomalyDetector", "production", mv.version
+            )
+            anomaly_promoted = True
+            logger.info(
+                f"Anomaly detector promoted to production (version {mv.version})"
+            )
+        else:
+            logger.info(
+                f"Anomaly detector not promoted — rate {anomaly_metrics['anomaly_rate']:.4f} did not improve"
+            )
 
-                if lstm_metrics["mape"] < previous_best_mape:
-                    logger.info("✅ New model is BETTER! Promoting to production...")
-                    # Promotion logic here
-                else:
-                    logger.info(
-                        f"⚠️  New model MAPE ({lstm_metrics['mape']:.4f}) "
-                        f"is worse than previous ({previous_best_mape:.4f})"
-                    )
+    return {
+        "status": "success",
+        "lstm_promoted": lstm_promoted,
+        "anomaly_promoted": anomaly_promoted,
+    }
 
-        logger.info("✅ Evaluation complete!")
-        return {"status": "success", "promoted": True}
-
-    except Exception as e:
-        logger.error(f"❌ Evaluation failed: {str(e)}")
-        raise
-
-
-# ============================================
-# DAG Definition
-# ============================================
 
 default_args = {
     "owner": "E2_Data_Intelligence",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "start_date": days_ago(1),
-    "email": ["team@example.com"],
+    "start_date": datetime(2025, 1, 1),
     "email_on_failure": True,
     "email_on_retry": False,
 }
@@ -344,50 +341,46 @@ default_args = {
 dag = DAG(
     "model_retraining_pipeline",
     default_args=default_args,
-    description="Retrain LSTM forecasting and anomaly detection models weekly",  # noqa: E501
-    schedule_interval="0 2 * * 1",  # Monday at 2 AM
+    description="Retrain LSTM forecasting and anomaly detection models weekly",
+    schedule_interval="0 2 * * 1",
     catchup=False,
     tags=["E2", "ML", "retraining"],
 )
 
-# ============================================
-# Tasks
-# ============================================
-
-# Task 1: Fetch latest data
 fetch_data_task = PythonOperator(
     task_id="fetch_training_data",
     python_callable=fetch_training_data,
-    provide_context=True,
     dag=dag,
 )
 
-# Task 2: Retrain LSTM model
 retrain_lstm_task = PythonOperator(
     task_id="retrain_lstm_model",
     python_callable=retrain_lstm_model,
-    provide_context=True,
     dag=dag,
 )
 
-# Task 3: Evaluate and promote
+retrain_anomaly_task = PythonOperator(
+    task_id="retrain_anomaly_model",
+    python_callable=retrain_anomaly_model,
+    dag=dag,
+)
+
 evaluate_task = PythonOperator(
     task_id="evaluate_and_promote",
     python_callable=evaluate_and_promote,
-    provide_context=True,
     dag=dag,
 )
 
-# Task 4: Cleanup (optional)
 cleanup_task = BashOperator(
     task_id="cleanup",
-    bash_command="rm -f /tmp/training_data.csv",
+    bash_command="rm -f /tmp/training_features.csv /tmp/training_telemetry.csv /tmp/anomaly_model/detector.pkl",
     dag=dag,
 )
 
-# ============================================
-# Define Task Dependencies
-# ============================================
-
-# Sequential execution: fetch → retrain → evaluate → cleanup
-fetch_data_task >> retrain_lstm_task >> evaluate_task >> cleanup_task
+# fetch → [lstm, anomaly in parallel] → evaluate → cleanup
+(
+    fetch_data_task
+    >> [retrain_lstm_task, retrain_anomaly_task]
+    >> evaluate_task
+    >> cleanup_task
+)
