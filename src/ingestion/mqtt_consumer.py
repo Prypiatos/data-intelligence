@@ -1,8 +1,13 @@
 import json
+import os
+
 import paho.mqtt.client as mqtt
 
 from kafka_producer import publish_events, publish_health, publish_telemetry
 from validator import validate_telemetry
+
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -63,7 +68,7 @@ def main():
     client.on_connect = on_connect
     client.on_message = on_message
 
-    client.connect("localhost", 1883, 60)
+    client.connect(MQTT_HOST, MQTT_PORT, 60)
     client.loop_forever()
 
 

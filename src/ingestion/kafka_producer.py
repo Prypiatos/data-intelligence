@@ -1,7 +1,11 @@
 import json
+import os
+
 from kafka import KafkaProducer
 
 producer = None
+
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_HOST", "localhost:9092")
 
 
 def get_producer():
@@ -9,7 +13,7 @@ def get_producer():
 
     if producer is None:
         producer = KafkaProducer(
-            bootstrap_servers="localhost:9092",
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
             value_serializer=lambda value: json.dumps(value).encode("utf-8"),
         )
 
