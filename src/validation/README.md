@@ -24,3 +24,39 @@ run From the `data-intelligence` folder:
 ```bash
 python3 -m src.validation.telemetry_expectations
 ```
+
+## Airflow Validation DAG
+
+The Airflow DAG in `dags/data-validation-dag.py` runs the telemetry validation
+rules against PostgreSQL rows for each daily Airflow data interval.
+
+Run Airflow locally from the `data-intelligence` folder:
+
+```bash
+docker compose build airflow
+docker compose up postgres airflow
+```
+
+Open the Airflow UI:
+
+```text
+http://localhost:8081
+```
+
+Local development login:
+
+```text
+admin / admin
+```
+
+Trigger this DAG manually:
+
+```text
+data_validation_dag
+```
+
+Expected behavior:
+
+- logs a validation summary with checked, passed, and failed row counts
+- succeeds when no invalid telemetry rows are found
+- fails the task when invalid telemetry rows are found
