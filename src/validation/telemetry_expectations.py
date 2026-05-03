@@ -1,3 +1,4 @@
+# pyright: reportPrivateImportUsage=false
 import great_expectations as gx
 import great_expectations.expectations as gxe
 import pandas as pd
@@ -23,15 +24,23 @@ def validate_telemetry(data):
 
     # Show type problems before range problems because they are easier to debug.
     for result in failed_results:
-        if result.expectation_config.type == "expect_column_values_to_be_of_type":
-            column = result.expectation_config.kwargs.get("column", "table")
+        expectation_config = result.expectation_config
+
+        if expectation_config is None:
+            continue
+
+        if expectation_config.type == "expect_column_values_to_be_of_type":
+            column = expectation_config.kwargs.get("column", "table")
             return False, f"Validation failed for '{column}': expected correct type"
 
     for result in failed_results:
-        column = result.expectation_config.kwargs.get("column", "table")
-        return False, (
-            f"Validation failed for '{column}': {result.expectation_config.type}"
-        )
+        expectation_config = result.expectation_config
+
+        if expectation_config is None:
+            continue
+
+        column = expectation_config.kwargs.get("column", "table")
+        return False, f"Validation failed for '{column}': {expectation_config.type}"
 
     return False, "Telemetry validation failed"
 
