@@ -171,6 +171,7 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    restart: on-failure
     volumes:
       - .:/app
     networks:
