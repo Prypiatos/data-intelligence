@@ -21,7 +21,7 @@ def validate_message(value):
                 "data": None,
             }
         )
-    try: 
+    try:
         payload = json.loads(value)
     except json.JSONDecodeError:
         return json.dumps(
@@ -31,7 +31,7 @@ def validate_message(value):
                 "data": None,
             }
         )
-    
+
     is_valid, message = validate_telemetry(payload)
 
     return json.dumps(
@@ -68,8 +68,7 @@ class TelemetryTimestampAssigner(TimestampAssigner):
 def assign_event_time(stream):
     """Assign event time stamps to the stream based on the 'timestamp' field in telemetry records."""
     watermark_strategy = (
-        WatermarkStrategy
-        .for_bounded_out_of_orderness(Duration.of_seconds(5))
+        WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(5))
         .with_timestamp_assigner(TelemetryTimestampAssigner())
     )
 

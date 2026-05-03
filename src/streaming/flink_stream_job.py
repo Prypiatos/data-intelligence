@@ -1,20 +1,17 @@
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.common.watermark_strategy import WatermarkStrategy
-from src.streaming.kafka_source import build_kafka_source
-from src.streaming.kafka_results_sink import build_kafka_sink
-from pyflink.common.typeinfo import Types
-
-
 from pathlib import Path
 
+from pyflink.common.typeinfo import Types
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.common.watermark_strategy import WatermarkStrategy
 
-
+from src.streaming.kafka_source import build_kafka_source
+from src.streaming.kafka_results_sink import build_kafka_sink
 from src.streaming.telemetry_transforms import (
     SummarizeWindow,
+    assign_event_time,
     extract_valid_records,
     validate_stream,
     window_records,
-    assign_event_time,
 )
 
 
@@ -41,12 +38,12 @@ def build_kafka_job():
     sink = build_kafka_sink()
     stream = env.from_source(source, WatermarkStrategy.no_watermarks(), "kafka-source")
     validated = validate_stream(stream)
-    validated.print()  # Print validation results for debugging
-    valid_records = extract_valid_records(validated)  
+    validated.print()
+    valid_records = extract_valid_records(validated)
     event_time_records = assign_event_time(valid_records)
     windowed = window_records(event_time_records)
-    summaries = windowed.process(SummarizeWindow(),output_type=Types.STRING())
-    summaries.print() #Print summaries for debugging
+    summaries = windowed.process(SummarizeWindow(), output_type=Types.STRING())
+    summaries.print()
     summaries.sink_to(sink)
     env.execute("streaming-kafka-job")
 
