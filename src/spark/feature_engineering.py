@@ -49,7 +49,7 @@ class Config:
     POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
     # Security: SSL/TLS for database connections
-    POSTGRES_SSL_MODE = os.getenv("POSTGRES_SSL_MODE", "require")
+    POSTGRES_SSL_MODE = os.getenv("POSTGRES_SSL_MODE", "disable")
     # Options: require, disable, allow, prefer
 
     @staticmethod
@@ -73,16 +73,9 @@ class Config:
         logger.info("✅ PostgreSQL configuration validated")
 
     # Tables (PostgreSQL schema)
-    # Source: raw telemetry with voltage, current, power
     RAW_TABLE = "telemetry_readings"
-    # Source: node type and location info
     NODE_METADATA_TABLE = "node_metadata"
-    # Intermediate: aggregated to hourly
-    HOURLY_TABLE = "hourly_energy_readings"
-    # Output: engineered features
     FEATURES_TABLE = "energy_features"
-    # Output: forecast predictions
-    FORECASTS_TABLE = "forecasts"
 
     # Spark Configuration
     SPARK_MASTER = os.getenv("SPARK_MASTER", "local")
@@ -472,7 +465,7 @@ def write_features(df, spark: SparkSession) -> bool:
             .option("user", Config.POSTGRES_USER)
             .option("password", Config.POSTGRES_PASSWORD)
             .option("driver", "org.postgresql.Driver")
-            .mode("overwrite")
+            .mode("append")
             .save()
         )
 
@@ -543,8 +536,9 @@ def run_feature_engineering_pipeline():
 
     finally:
         try:
-            spark.stop()
-            logger.info("Spark session closed")
+            if "spark" in dir():
+                spark.stop()
+                logger.info("Spark session closed")
         except Exception:
             pass
 
