@@ -3,11 +3,10 @@ import logging
 import torch
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import create_engine
 import mlflow
 import mlflow.pytorch
-from lstm_model import LSTMForecaster
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
