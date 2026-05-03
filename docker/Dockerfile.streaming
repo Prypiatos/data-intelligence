@@ -11,8 +11,11 @@ COPY requirements.streaming.txt .
 
 RUN pip install --no-cache-dir -r requirements.streaming.txt
 
-COPY lib/flink-connector-kafka-1.17.2.jar /app/lib/
-COPY lib/kafka-clients-3.2.3.jar /app/lib/
+RUN mkdir -p /app/lib && \
+    curl -fsSL https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/1.17.2/flink-connector-kafka-1.17.2.jar \
+         -o /app/lib/flink-connector-kafka-1.17.2.jar && \
+    curl -fsSL https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.2.3/kafka-clients-3.2.3.jar \
+         -o /app/lib/kafka-clients-3.2.3.jar
 
 COPY src/ ./src/
 
