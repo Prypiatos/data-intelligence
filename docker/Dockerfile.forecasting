@@ -1,8 +1,6 @@
-
 FROM python:3.11-slim
 
 WORKDIR /app
-
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -15,12 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements_forecasting.txt .
 
-
 RUN pip install --no-cache-dir -r requirements_forecasting.txt
 
-# Copy the entire source code
 COPY src/ ./src/
-
 
 RUN mkdir -p /app/logs /app/artifacts
 
