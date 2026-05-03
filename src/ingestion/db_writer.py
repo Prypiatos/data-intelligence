@@ -43,6 +43,10 @@ def insert_telemetry(data):
         return False
 
     except Exception as error:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
         print("WARNING: PostgreSQL insert failed:", error)
         return None
