@@ -20,7 +20,7 @@ This document tells E3 exactly how to consume the E2 REST API.
 
 ### GET /health
 
-Liveness check. Use this to gate UI startup or show a connectivity status indicator.
+Liveness check. Call this on app startup to confirm E2 is reachable before rendering data.
 
 **Response `200`:**
 ```json
@@ -39,11 +39,11 @@ Returns detected energy anomalies. Use this to populate alert lists, dashboards,
 
 **Query parameters:**
 
-| Parameter | Type | Description |
-|---|---|---|
-| `node_id` | string | Filter to a specific meter/device |
-| `severity` | string | Filter by `"high"`, `"medium"`, or `"normal"` |
-| `limit` | integer | Max records (default 100) |
+| Parameter | Type | Default | Max | Description |
+|---|---|---|---|---|
+| `node_id` | string | — | — | Filter to a specific meter/device |
+| `severity` | string | — | — | Filter by `"high"`, `"medium"`, or `"low"` |
+| `limit` | integer | 100 | 1000 | Max records returned |
 
 **Example request:**
 ```
@@ -56,7 +56,7 @@ GET /anomalies?node_id=node_001&severity=high&limit=20
   {
     "node_id": "node_001",
     "timestamp": 1714800000000,
-    "anomaly_type": "voltage_spike",
+    "anomaly_type": "theft_or_leakage",
     "score": -0.18,
     "severity": "high"
   }
@@ -66,18 +66,32 @@ GET /anomalies?node_id=node_001&severity=high&limit=20
 | Field | Type | Notes |
 |---|---|---|
 | `node_id` | string | Device/meter identifier |
-| `timestamp` | integer | Unix epoch milliseconds — convert to display time |
-| `anomaly_type` | string | e.g. `"voltage_spike"`, `"energy_theft"`, `"unusual_consumption"` |
-| `score` | float | Isolation Forest score — more negative = more anomalous |
-| `severity` | string | `"high"`, `"medium"`, or `"normal"` |
+| `timestamp` | integer | Unix epoch milliseconds — see timestamp section below |
+| `anomaly_type` | string | Currently always `"theft_or_leakage"` |
+| `score` | float | Isolation Forest anomaly score — see score section below |
+| `severity` | string | `"high"`, `"medium"`, or `"low"` — see severity section below |
 
 Returns an empty array `[]` if no anomalies exist — not a 404.
+
+**Only non-normal readings are stored.** The `severity` field will never be `"normal"` in this response — those readings are filtered at the pipeline level.
+
+#### Anomaly score interpretation
+
+| Score range | Severity | Meaning |
+|---|---|---|
+| ≤ −0.15 | `high` | Strong anomaly — likely meter fault or energy theft |
+| −0.15 to −0.05 | `medium` | Moderate anomaly — worth investigating |
+| −0.05 to 0.0 | `low` | Mild deviation — monitor |
+
+More negative = more anomalous. Scores above 0 are normal and not stored.
 
 ---
 
 ### GET /recommendations
 
 Returns energy optimization recommendations derived from anomaly data. Use this for the recommendations panel or notification feed.
+
+**Important:** This endpoint generates results live on each call by querying the last 6 hours of anomaly data and 24-hour forecasts. Response time is typically under 200 ms but may be slower under heavy DB load. Do not call this more than once per minute.
 
 **Response `200`:**
 ```json
@@ -87,7 +101,7 @@ Returns energy optimization recommendations derived from anomaly data. Use this 
     "type": "high_anomaly",
     "severity": "high",
     "message": "Node node_001 has 3 high-severity anomalies in the last 24h. Inspect meter and wiring.",
-    "generated_at": "2026-05-04T07:00:00",
+    "generated_at": "2026-05-04T07:00:00+00:00",
     "metadata": {}
   }
 ]
@@ -99,21 +113,29 @@ Returns energy optimization recommendations derived from anomaly data. Use this 
 | `type` | string | `"high_anomaly"`, `"load_shift"`, or `"high_consumption"` |
 | `severity` | string | `"high"`, `"medium"`, or `"low"` |
 | `message` | string | Ready-to-display text — no formatting needed |
-| `generated_at` | string | ISO 8601 datetime string |
-| `metadata` | object | Additional context, may be empty `{}` |
+| `generated_at` | string | ISO 8601 datetime with UTC offset |
+| `metadata` | object | Additional context — may be empty `{}` |
+
+**Recommendation types:**
+
+| Type | Trigger | Meaning for user |
+|---|---|---|
+| `high_anomaly` | Node has multiple high-severity anomalies in last 6h | Possible meter fault or energy theft — inspect hardware |
+| `load_shift` | Forecasted consumption peaks in top 10% | Suggest shifting load away from peak hours |
+| `high_consumption` | Predicted consumption exceeds 800W threshold | Unusually high usage — review connected devices |
 
 ---
 
 ### GET /forecast/forecasts
 
-Returns stored 24-hour load forecasts from the database. Use this to display historical/pre-computed forecast charts per node.
+Returns stored 24-hour load forecasts from the database. Use this to display forecast charts per node.
 
 **Query parameters:**
 
-| Parameter | Type | Description |
-|---|---|---|
-| `node_id` | string | Filter to a specific meter/device |
-| `limit` | integer | Max records (default 100) |
+| Parameter | Type | Default | Max | Description |
+|---|---|---|---|---|
+| `node_id` | string | — | — | Filter to a specific meter/device |
+| `limit` | integer | 100 | 1000 | Max records returned |
 
 **Response `200`:**
 ```json
@@ -131,6 +153,8 @@ Returns stored 24-hour load forecasts from the database. Use this to display his
 | `node_id` | string | Device/meter identifier |
 | `timestamp` | integer | Unix epoch milliseconds of the forecast point |
 | `predicted_consumption` | float | Predicted power in watts |
+
+Returns an empty array `[]` if no forecasts have been generated yet. Forecasts are populated by the Airflow model retraining DAG — they may be empty on a fresh system.
 
 ---
 
@@ -156,8 +180,8 @@ On-demand 24-hour forecast given the last 10 hourly readings. Use this for inter
 }
 ```
 
-- `forecast` — array of 24 floats, one per hour starting from now
-- `hours_ahead` — always 24
+- `forecast` — array of exactly 24 floats, one per hour starting from now
+- `hours_ahead` — always `24`
 - `unit` — always `"watts"`
 
 **Response `400`** (wrong input length):
@@ -165,13 +189,13 @@ On-demand 24-hour forecast given the last 10 hourly readings. Use this for inter
 { "detail": "Expected 10 power readings, got 5" }
 ```
 
-> **Note:** This endpoint runs ML inference on each call (~80 ms). Use it on-demand, not for polling. For display purposes, prefer `/forecast/forecasts` which returns pre-computed results.
+> **Performance note:** This endpoint runs LSTM inference on every call (~80 ms, CPU-bound). Use it on-demand (user action), not for polling. For chart display, prefer `/forecast/forecasts` which returns pre-computed results.
 
 ---
 
 ### POST /forecast/predict-batch
 
-Forecast multiple nodes in a single request. Useful when loading a dashboard with several nodes at once.
+Forecast multiple nodes in one request. Use this when loading a dashboard with several nodes at once to avoid N sequential calls.
 
 **Request body:**
 ```json
@@ -187,8 +211,8 @@ Forecast multiple nodes in a single request. Useful when loading a dashboard wit
 ```json
 {
   "forecasts": [
-    [412.3, 425.1, 438.7, "...24 values"],
-    [308.2, 312.4, 316.8, "...24 values"]
+    [412.3, 425.1, 438.7, "...24 values total"],
+    [308.2, 312.4, 316.8, "...24 values total"]
   ],
   "count": 2,
   "hours_ahead": 24,
@@ -200,21 +224,27 @@ Forecast multiple nodes in a single request. Useful when loading a dashboard wit
 
 ## Errors
 
-| Status | Meaning |
-|---|---|
-| `400` | Bad request — check your input (e.g. wrong number of readings) |
-| `503` | E2 database temporarily unavailable — retry after a short wait |
+| Status | Meaning | What to do |
+|---|---|---|
+| `400` | Bad request — invalid input | Fix the request (e.g. send exactly 10 readings) |
+| `503` | E2 database or model unavailable | Retry with exponential backoff — start at 2 s, cap at 30 s |
 
-Error body always has the shape:
+Error body always:
 ```json
 { "detail": "Description of the error" }
 ```
 
 ---
 
-## CORS
+## Node discovery
 
-CORS is enabled on the E2 API. If you hit issues from a browser, let us know the origin and we will whitelist it via the `CORS_ALLOWED_ORIGINS` environment variable.
+There is no `/nodes` endpoint. E3 cannot query E2 for the list of available node IDs. Node IDs come from E1 (the edge devices). Coordinate with E1 to get the list of active node IDs, or display data dynamically based on what appears in `/anomalies` and `/forecast/forecasts` responses.
+
+---
+
+## Pagination
+
+There is no cursor or offset pagination. Use the `limit` parameter (max 1000). If you need all records beyond 1000, contact E2 — we can add offset support.
 
 ---
 
@@ -223,8 +253,21 @@ CORS is enabled on the E2 API. If you hit issues from a browser, let us know the
 All `timestamp` fields are **Unix epoch milliseconds** (13-digit integers). Convert to local time in the UI:
 
 ```js
+// JavaScript
 new Date(1714800000000).toLocaleString()
+
+// Or with a formatting library
+import { format } from 'date-fns';
+format(new Date(1714800000000), 'dd MMM yyyy HH:mm')
 ```
+
+`generated_at` on recommendations is an ISO 8601 string with UTC offset — parse directly with `new Date(generated_at)`.
+
+---
+
+## CORS
+
+CORS is enabled. If you hit browser CORS errors, share your origin URL with E2 and we will whitelist it via `CORS_ALLOWED_ORIGINS`.
 
 ---
 
@@ -232,11 +275,11 @@ new Date(1714800000000).toLocaleString()
 
 | Endpoint | Suggested approach |
 |---|---|
-| `/anomalies` | Poll every 30–60 seconds for live alert feeds |
-| `/recommendations` | Poll every 60 seconds or on user page load |
+| `/anomalies` | Poll every 30–60 s for live alert feeds |
+| `/recommendations` | Poll every 60 s maximum — generates live on each call |
 | `/forecast/forecasts` | Load once on page load, refresh every few minutes |
-| `/forecast/predict` | Call on-demand only (user action, not polling) |
-| `/health` | Check once on app startup |
+| `/forecast/predict` | On user action only — not for polling |
+| `/health` | Once on app startup |
 
 ---
 
@@ -248,19 +291,25 @@ const BASE = "http://localhost:8000";
 // Get high-severity anomalies for a node
 const anomalies = await fetch(`${BASE}/anomalies?node_id=node_001&severity=high`)
   .then(r => r.json());
+// Returns: [{ node_id, timestamp, anomaly_type, score, severity }, ...]
 
 // Get recommendations
 const recs = await fetch(`${BASE}/recommendations`)
   .then(r => r.json());
+// Returns: [{ node_id, type, severity, message, generated_at, metadata }, ...]
 
 // On-demand forecast
-const forecast = await fetch(`${BASE}/forecast/predict`, {
+const result = await fetch(`${BASE}/forecast/predict`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ power_readings: [400, 420, 450, 480, 500, 470, 420, 380, 350, 340] })
+  body: JSON.stringify({
+    power_readings: [400, 420, 450, 480, 500, 470, 420, 380, 350, 340]
+  })
 }).then(r => r.json());
+// result.forecast → array of 24 watts values
 
-console.log(forecast.forecast); // [412.3, 425.1, ...]
+// Convert timestamp to display time
+const displayTime = new Date(anomalies[0]?.timestamp).toLocaleString();
 ```
 
 ---
