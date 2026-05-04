@@ -15,15 +15,18 @@ Dependencies:
 import logging
 import os
 import shlex
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
+import pendulum
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
 logger = logging.getLogger(__name__)
 
-REPO_ROOT = Path(os.getenv("ENERGY_REPO_ROOT", Path(__file__).resolve().parents[1]))
+REPO_ROOT = Path(
+    os.getenv("ENERGY_REPO_ROOT", str(Path(__file__).resolve().parents[1]))
+)
 SPARK_SUBMIT_BIN = os.getenv("SPARK_SUBMIT_BIN", "spark-submit")
 POSTGRES_JDBC_PACKAGE = os.getenv(
     "POSTGRES_JDBC_PACKAGE",
@@ -86,8 +89,8 @@ default_args = {
     "owner": "E2_Data_Intelligence",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "start_date": datetime(2025, 1, 1),
-    "email_on_failure": True,
+    "start_date": pendulum.datetime(2025, 1, 1, tz="UTC"),
+    "email_on_failure": False,
     "email_on_retry": False,
     "on_execute_callback": log_task_start,
     "on_success_callback": log_task_success,
@@ -98,7 +101,7 @@ dag = DAG(
     "energy_batch_pipeline",
     default_args=default_args,
     description="Run daily Spark feature engineering and batch analytics jobs",
-    schedule_interval="0 1 * * *",
+    schedule="0 1 * * *",
     catchup=False,
     tags=["E2", "Spark", "batch"],
 )
