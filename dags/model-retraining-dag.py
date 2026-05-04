@@ -18,7 +18,7 @@ Dependencies:
 
 import logging
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pendulum
 from airflow import DAG
