@@ -17,10 +17,10 @@ from sqlalchemy import create_engine, text
 
 logger = logging.getLogger(__name__)
 
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "energy_user")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "energy_pass")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
 HIGH_CONSUMPTION_WATTS = float(os.getenv("HIGH_CONSUMPTION_THRESHOLD", "800"))
@@ -61,7 +61,7 @@ def fetch_anomalies(engine=None) -> pd.DataFrame:
     if engine is None:
         engine = _get_engine()
     query = text(f"""
-        SELECT node_id, timestamp, anomaly_score, severity
+        SELECT node_id, timestamp, score AS anomaly_score, severity
         FROM anomaly_records
         WHERE timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL '{ANOMALY_LOOKBACK_HOURS} hours') * 1000
         ORDER BY timestamp DESC

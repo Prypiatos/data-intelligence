@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules from other teams
-from src.api.routes import forecasting, health
+from src.api.routes import anomalies, forecasting, health, recommendations
 
 # ============================================
 # Create FastAPI Application
@@ -50,6 +50,8 @@ app.add_middleware(
 # This is where multiple teams combine their work
 app.include_router(health.router)
 app.include_router(forecasting.router)
+app.include_router(anomalies.router)
+app.include_router(recommendations.router)
 
 # When Person 4 creates their API infrastructure routes, they'll add:
 # app.include_router(api_routes.router)
@@ -75,8 +77,11 @@ def root():
         "team": "E2 Data & Intelligence",
         "endpoints": {
             "health": "/health (GET)",
-            "forecast": "/forecast/predict (POST)",
+            "forecasts": "/forecast/forecasts (GET)",
+            "forecast_predict": "/forecast/predict (POST)",
             "forecast_batch": "/forecast/predict-batch (POST)",
+            "anomalies": "/anomalies (GET)",
+            "recommendations": "/recommendations (GET)",
             "documentation": "/docs (GET)",
         },
         "docs_url": "/docs",
