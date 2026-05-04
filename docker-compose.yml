@@ -199,16 +199,32 @@ services:
       - energy_network
 
   airflow:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.airflow
     container_name: energy-airflow
-    command: ["sh", "-c", "while true; do echo airflow running; sleep 10; done"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
+    environment:
+      PYTHONPATH: /opt/airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
     ports:
       - "8081:8080"
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+      airflow webserver & airflow scheduler
+      "
     restart: unless-stopped
     networks:
       - energy_network
+
 
   api:
     build:
