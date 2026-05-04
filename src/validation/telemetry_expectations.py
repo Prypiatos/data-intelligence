@@ -4,15 +4,17 @@ import great_expectations.expectations as gxe
 import pandas as pd
 
 
-def validate_telemetry(data):
-    """Validate one telemetry record with Great Expectations."""
-
-    dataframe = pd.DataFrame([data])
+def _run_validation(df: pd.DataFrame, result_format: str = "SUMMARY"):
+    """Create one GX context, validate df, and return the result."""
     context = gx.get_context()
     data_source = context.data_sources.add_pandas(name="telemetry_data_source")
-    batch = data_source.read_dataframe(dataframe)
-    suite = build_telemetry_suite()
-    validation_result = batch.validate(suite)
+    batch = data_source.read_dataframe(df)
+    return batch.validate(build_telemetry_suite(), result_format=result_format)
+
+
+def validate_telemetry(data: dict):
+    """Validate one telemetry record with Great Expectations."""
+    validation_result = _run_validation(pd.DataFrame([data]))
 
     if validation_result.success:
         return True, "Telemetry data is valid"
@@ -43,6 +45,11 @@ def validate_telemetry(data):
         return False, f"Validation failed for '{column}': {expectation_config.type}"
 
     return False, "Telemetry validation failed"
+
+
+def validate_telemetry_dataframe(df: pd.DataFrame):
+    """Validate a batch DataFrame with a single GX context — not per-row."""
+    return _run_validation(df, result_format="COMPLETE")
 
 
 def build_telemetry_suite():

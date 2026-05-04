@@ -1,9 +1,10 @@
 import os
 
+import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from src.validation.telemetry_expectations import validate_telemetry
+from src.validation.telemetry_expectations import validate_telemetry_dataframe
 
 
 def get_postgres_connection():
@@ -36,23 +37,60 @@ def fetch_telemetry_batch(start_time, end_time):
 def validate_telemetry_batch(start_time, end_time):
     """Validate telemetry rows for one interval and return a summary."""
     records = fetch_telemetry_batch(start_time, end_time)
-    failures = []
-
-    for record in records:
-        is_valid, reason = validate_telemetry(record)
-
-        if not is_valid:
-            failures.append(
-                {
-                    "node_id": record.get("node_id"),
-                    "timestamp": record.get("timestamp"),
-                    "reason": reason,
-                }
-            )
-
     checked = len(records)
-    failed = len(failures)
 
+    if not records:
+        return {
+            "start_time": str(start_time),
+            "end_time": str(end_time),
+            "checked": 0,
+            "passed": 0,
+            "failed": 0,
+            "failures": [],
+        }
+
+    df = pd.DataFrame(records)
+    validation_result = validate_telemetry_dataframe(df)
+
+    if validation_result.success:
+        return {
+            "start_time": str(start_time),
+            "end_time": str(end_time),
+            "checked": checked,
+            "passed": checked,
+            "failed": 0,
+            "failures": [],
+        }
+
+    # Map row index → first failure reason using GX's unexpected_index_list
+    # (available because validate_telemetry_dataframe uses result_format="COMPLETE")
+    failure_reasons: dict[int, str] = {}
+    for result in validation_result.results:
+        if result.success:
+            continue
+        config = result.expectation_config
+        if config is None:
+            continue
+        col = config.kwargs.get("column", "table")
+        reason = f"Validation failed for '{col}': {config.type}"
+        unexpected_indices = (result.result or {}).get("unexpected_index_list") or []
+        for idx in unexpected_indices:
+            failure_reasons.setdefault(idx, reason)
+
+    # Table-level failures (wrong column set) affect every row
+    if not failure_reasons:
+        failure_reasons = {i: "Telemetry validation failed" for i in range(checked)}
+
+    failures = [
+        {
+            "node_id": records[i].get("node_id"),
+            "timestamp": records[i].get("timestamp"),
+            "reason": reason,
+        }
+        for i, reason in sorted(failure_reasons.items())
+    ]
+
+    failed = len(failures)
     return {
         "start_time": str(start_time),
         "end_time": str(end_time),
