@@ -15,14 +15,18 @@ venv/
 lib/*.jar
 
 # ML / Data
-*.pkl
 *.joblib
 *.h5
 *.pt
-*.pth
 mlruns/
 spark-tmp/
 spark-ivy/
+
+# Model binaries — ignore by default but track the specific trained models below
+*.pkl
+*.pth
+!models/anomaly/detector.pkl
+!models/forecasting/lstm_model.pth
 
 # IDEs
 .vscode/
