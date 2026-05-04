@@ -254,8 +254,3 @@ Trigger the `model_retraining_pipeline` DAG manually after first boot to generat
 - **Streaming bind mount**: `streaming` mounts `.:/app` in compose — dev only. Remove in production.
 - **Model volume**: `./models` is a bind mount in compose. Replace with a named shared volume in production so `api` and `airflow` can both access it.
 
----
-
-## Contact
-
-E2 team: Tharupahan Jayawardana (architecture), babijana jegarashan (API/infra config)
