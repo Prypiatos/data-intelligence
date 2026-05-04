@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 from kafka_producer import publish_events, publish_health, publish_telemetry
 from validator import validate_telemetry
 
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 

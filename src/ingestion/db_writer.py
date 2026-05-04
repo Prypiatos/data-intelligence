@@ -1,17 +1,26 @@
+import os
+
 import psycopg2
 
-conn = psycopg2.connect(
-    host="localhost",
-    database="energy_db",
-    user="energy_user",
-    password="energy_pass",
-)
+_conn = None
 
-cursor = conn.cursor()
+
+def _get_conn():
+    global _conn
+    if _conn is None or _conn.closed:
+        _conn = psycopg2.connect(
+            host=os.getenv("POSTGRES_HOST", "postgres"),
+            database=os.getenv("POSTGRES_DB", "energy_db"),
+            user=os.getenv("POSTGRES_USER", "energy_user"),
+            password=os.getenv("POSTGRES_PASSWORD", "energy_pass"),
+        )
+    return _conn
 
 
 def insert_telemetry(data):
     try:
+        conn = _get_conn()
+        cursor = conn.cursor()
         query = """
         INSERT INTO telemetry_readings (
             node_id, timestamp, voltage, current, power, energy_wh
@@ -44,7 +53,7 @@ def insert_telemetry(data):
 
     except Exception as error:
         try:
-            conn.rollback()
+            _get_conn().rollback()
         except Exception:
             pass
 

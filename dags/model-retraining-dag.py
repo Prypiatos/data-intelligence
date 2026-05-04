@@ -16,22 +16,24 @@ Dependencies:
 - Task #2: Feature engineering pipeline
 """
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
-from datetime import datetime, timedelta
 import logging
 import os
+from datetime import datetime, timedelta
+
+import pendulum
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 
 logger = logging.getLogger(__name__)
 
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "energy_user")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "energy_pass")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MLFLOW_FORECASTING_EXPERIMENT = "load-forecasting"
 MLFLOW_ANOMALY_EXPERIMENT = "anomaly-detection"
 
@@ -75,8 +77,8 @@ def fetch_training_data(**context):
     )
     logger.info(f"Fetched {len(telemetry_df):,} rows from telemetry_readings")
 
-    features_path = "/tmp/training_features.csv"
-    telemetry_path = "/tmp/training_telemetry.csv"
+    features_path = "/opt/airflow/data/training_features.csv"
+    telemetry_path = "/opt/airflow/data/training_telemetry.csv"
     features_df.to_csv(features_path, index=False)
     telemetry_df.to_csv(telemetry_path, index=False)
 
@@ -234,7 +236,7 @@ def retrain_anomaly_model(**context):
         metrics = _compute_metrics(predictions)
         mlflow.log_metrics(metrics)
 
-        output_dir = "/tmp/anomaly_model"
+        output_dir = "/opt/airflow/data/anomaly_model"
         detector.save(output_dir)
         mlflow.log_artifact(f"{output_dir}/detector.pkl", artifact_path="model")
 
@@ -333,8 +335,8 @@ default_args = {
     "owner": "E2_Data_Intelligence",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "start_date": datetime(2025, 1, 1),
-    "email_on_failure": True,
+    "start_date": pendulum.datetime(2025, 1, 1, tz="UTC"),
+    "email_on_failure": False,
     "email_on_retry": False,
 }
 
@@ -342,7 +344,7 @@ dag = DAG(
     "model_retraining_pipeline",
     default_args=default_args,
     description="Retrain LSTM forecasting and anomaly detection models weekly",
-    schedule_interval="0 2 * * 1",
+    schedule="0 2 * * 1",
     catchup=False,
     tags=["E2", "ML", "retraining"],
 )
@@ -373,7 +375,7 @@ evaluate_task = PythonOperator(
 
 cleanup_task = BashOperator(
     task_id="cleanup",
-    bash_command="rm -f /tmp/training_features.csv /tmp/training_telemetry.csv /tmp/anomaly_model/detector.pkl",
+    bash_command="rm -f /opt/airflow/data/training_features.csv /opt/airflow/data/training_telemetry.csv /opt/airflow/data/anomaly_model/detector.pkl",
     dag=dag,
 )
 

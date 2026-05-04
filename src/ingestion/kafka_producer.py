@@ -5,7 +5,7 @@ from kafka import KafkaProducer
 
 producer = None
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_HOST", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 
 
 def get_producer():
