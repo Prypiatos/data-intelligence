@@ -22,7 +22,7 @@ E2 is responsible for the data and intelligence layer of the Energy Management S
 
 ---
 
-![Architecture Diagram](./architecture.png)
+![Architecture Diagram](https://drive.google.com/uc?id=1dZXhS-OpybDQser86qXFLSmPbmU2Iqg5)
 
 ---
 

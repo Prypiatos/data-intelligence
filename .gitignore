@@ -43,3 +43,4 @@ Thumbs.db
 .ipynb_checkpoints/
 data/*.txt
 data/*.csv
+architecture.png
