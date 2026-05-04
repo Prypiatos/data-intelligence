@@ -1,9 +1,33 @@
 """Unit tests for Flink stream processor transformations and windowing logic."""
 
 import json
+import sys
+import types
 from unittest.mock import Mock, patch
 
-from src.streaming import telemetry_transforms as transforms
+# pyflink requires a full Flink/JVM installation not present in the unit test
+# environment — mock it before importing telemetry_transforms, same pattern as
+# test-ingestion.py uses for kafka.
+_pyflink = types.ModuleType("pyflink")
+_pyflink_common = types.ModuleType("pyflink.common")
+_pyflink_common.Duration = Mock()
+_pyflink_common.Time = Mock()
+_pyflink_common.WatermarkStrategy = Mock()
+_pyflink_datastream = types.ModuleType("pyflink.datastream")
+_pyflink_datastream_functions = types.ModuleType("pyflink.datastream.functions")
+_pyflink_datastream_functions.ProcessWindowFunction = object
+_pyflink_datastream_window = types.ModuleType("pyflink.datastream.window")
+_pyflink_datastream_window.TumblingEventTimeWindows = Mock()
+_pyflink_common_watermark = types.ModuleType("pyflink.common.watermark_strategy")
+_pyflink_common_watermark.TimestampAssigner = object
+sys.modules["pyflink"] = _pyflink
+sys.modules["pyflink.common"] = _pyflink_common
+sys.modules["pyflink.datastream"] = _pyflink_datastream
+sys.modules["pyflink.datastream.functions"] = _pyflink_datastream_functions
+sys.modules["pyflink.datastream.window"] = _pyflink_datastream_window
+sys.modules["pyflink.common.watermark_strategy"] = _pyflink_common_watermark
+
+from src.streaming import telemetry_transforms as transforms  # noqa: E402
 
 
 def valid_telemetry() -> dict:
