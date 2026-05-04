@@ -60,3 +60,17 @@ Expected behavior:
 - logs a validation summary with checked, passed, and failed row counts
 - succeeds when no invalid telemetry rows are found
 - fails the task when invalid telemetry rows are found
+
+## Run Unit Tests
+
+From the `data-intelligence` folder:
+
+```bash
+python -m pytest tests/unit/test-validation.py -v
+```
+
+To run validation tests together with the streaming transformation tests:
+
+```bash
+python -m pytest tests/unit/test-streaming.py tests/unit/test-validation.py -v
+```
