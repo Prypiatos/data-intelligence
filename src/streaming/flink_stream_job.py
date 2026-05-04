@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.common.watermark_strategy import WatermarkStrategy
@@ -16,18 +14,8 @@ from src.streaming.telemetry_transforms import (
 
 
 def build_environment():
-    """Create the Flink execution environment."""
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(1)
-
-    project_root = Path(__file__).resolve().parents[2]
-    flink_kafka_jar = project_root / "lib" / "flink-connector-kafka-1.17.2.jar"
-    kafka_clients_jar = project_root / "lib" / "kafka-clients-3.2.3.jar"
-    env.add_jars(
-        flink_kafka_jar.as_uri(),
-        kafka_clients_jar.as_uri(),
-    )
-
     return env
 
 

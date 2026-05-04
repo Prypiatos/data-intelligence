@@ -3,19 +3,23 @@ FROM python:3.10-bullseye
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-    openjdk-11-jre-headless \
+    openjdk-11-jdk \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.streaming.txt .
 
-RUN pip install --no-cache-dir -r requirements.streaming.txt
+RUN export JAVA_HOME=$(find /usr/lib/jvm -maxdepth 1 -type d -name "java-11-openjdk-*" | head -1) && \
+    pip install --no-cache-dir -r requirements.streaming.txt
 
-RUN mkdir -p /app/lib && \
+RUN PYFLINK_LIB=$(python3 -c "import pyflink; import os; print(os.path.join(os.path.dirname(pyflink.__file__), 'lib'))") && \
+    mkdir -p /app/lib && \
     curl -fsSL https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/1.17.2/flink-connector-kafka-1.17.2.jar \
          -o /app/lib/flink-connector-kafka-1.17.2.jar && \
     curl -fsSL https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.2.3/kafka-clients-3.2.3.jar \
-         -o /app/lib/kafka-clients-3.2.3.jar
+         -o /app/lib/kafka-clients-3.2.3.jar && \
+    cp /app/lib/flink-connector-kafka-1.17.2.jar "$PYFLINK_LIB/" && \
+    cp /app/lib/kafka-clients-3.2.3.jar "$PYFLINK_LIB/"
 
 COPY src/ ./src/
 
