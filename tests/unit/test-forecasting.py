@@ -1,15 +1,9 @@
+import numpy as np
 import pytest
 import torch
-import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
-# Assuming these are in your src/models/forecasting/lstm_model.py
-# Adjust imports based on your actual file structure
-try:
-    from src.models.forecasting.lstm_model import LSTMForecaster, create_mock_data
-except ImportError:
-    # For testing purposes, you can define them here
-    pass
+from src.models.forecasting.lstm_model import LSTMForecaster, create_mock_data
 
 
 class TestMockData:
@@ -212,6 +206,71 @@ class TestIntegration:
             X = torch.randn(1, 10, 1)
             output = model(X)
             assert output.shape == (1, 24), "Prediction shape should be consistent"
+
+
+class TestEdgeCases:
+    """Edge cases: missing fields, null values, insufficient history, realistic range."""
+
+    def test_missing_power_column_raises(self):
+        df = create_mock_data(days=7)
+        df = df.drop(columns=["power"])
+        scaler = MinMaxScaler()
+        with pytest.raises(KeyError):
+            scaler.fit_transform(df[["power"]])
+
+    def test_null_power_values_propagate_as_nan(self):
+        """MinMaxScaler does not guard against NaN — it silently corrupts the
+        scaled output. Data must be cleaned before preprocessing."""
+        df = create_mock_data(days=7)
+        df.loc[0, "power"] = np.nan
+        scaler = MinMaxScaler()
+        scaled = scaler.fit_transform(df[["power"]])
+        assert np.isnan(scaled).any(), "NaN input must propagate through MinMaxScaler"
+
+    def test_single_timestep_produces_full_forecast(self):
+        model = LSTMForecaster()
+        X = torch.randn(1, 1, 1)
+        output = model(X)
+        assert output.shape == (1, 24)
+
+    def test_sequence_shorter_than_forecast_horizon(self):
+        model = LSTMForecaster()
+        X = torch.randn(1, 12, 1)  # 12 timesteps < 24-hour horizon
+        output = model(X)
+        assert output.shape == (1, 24)
+
+    def test_predictions_within_realistic_range_after_inverse_scaling(self):
+        """After brief training on realistic data, inverse-scaled predictions
+        should stay within the plausible watt range of the training distribution."""
+        df = create_mock_data(days=30)
+        scaler = MinMaxScaler()
+        data = scaler.fit_transform(df[["power"]])
+
+        model = LSTMForecaster()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        loss_fn = torch.nn.MSELoss()
+
+        X = torch.FloatTensor(data[:-24]).unsqueeze(1)
+        y = torch.FloatTensor(data[24:, 0])
+
+        for _ in range(20):
+            optimizer.zero_grad()
+            pred = model(X)
+            loss = loss_fn(pred[-1], y[-24:])
+            loss.backward()
+            optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            window = torch.FloatTensor(data[-48:]).unsqueeze(0)  # (1, 48, 1)
+            scaled_pred = model(window).numpy()
+
+        predictions_w = scaler.inverse_transform(scaled_pred)[0]
+
+        assert predictions_w.min() >= 0, "Predictions must be non-negative watts"
+        assert (
+            predictions_w.max() <= 2000
+        ), "Predictions must be within realistic watt range"
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import json
+import os
 
 from kafka import KafkaConsumer
 
@@ -6,11 +7,13 @@ from db_writer import insert_telemetry
 from influx_writer import write_telemetry
 from validator import validate_telemetry
 
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+
 
 def create_consumer():
     return KafkaConsumer(
         "energy.telemetry",
-        bootstrap_servers="localhost:9092",
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         auto_offset_reset="earliest",
         enable_auto_commit=False,
         group_id="energy-storage-writer",

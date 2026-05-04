@@ -11,13 +11,22 @@ venv/
 # Environment
 .env
 
+# Java artifacts
+lib/*.jar
+
 # ML / Data
-*.pkl
 *.joblib
 *.h5
 *.pt
-*.pth
 mlruns/
+spark-tmp/
+spark-ivy/
+
+# Model binaries — ignore by default but track the specific trained models below
+*.pkl
+*.pth
+!models/anomaly/detector.pkl
+!models/forecasting/lstm_model.pth
 
 # IDEs
 .vscode/
@@ -32,3 +41,5 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+data/*.txt
+data/*.csv
