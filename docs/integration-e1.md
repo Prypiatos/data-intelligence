@@ -1,4 +1,4 @@
-# E2 Integration Guide — E1 (Device & Edge)
+# E2 Integration Guide - E1 (Device & Edge)
 
 This document tells E1 exactly what to publish and how to connect to the E2 data pipeline.
 
@@ -40,7 +40,7 @@ E1 must publish to exactly these three topic patterns:
 
 ## Payload Schemas
 
-All payloads must be valid JSON. **One reading per message** — do not batch multiple readings in a single payload. Invalid messages are logged and silently dropped; they will not reach the database.
+All payloads must be valid JSON. **One reading per message**. Do not batch multiple readings in a single payload. Invalid messages are logged and dropped. They will not reach the database.
 
 ### Telemetry — `energy/nodes/{node_id}/telemetry`
 
@@ -64,7 +64,7 @@ All payloads must be valid JSON. **One reading per message** — do not batch mu
 | `power` | float | > 0 (watts) |
 | `energy_wh` | float | ≥ 0 |
 
-The payload must contain **exactly** these six fields — no extra fields, no missing fields. Messages that fail validation are logged and discarded.
+The payload must contain **exactly** these six fields. No extra/missing fields. Messages that fail validation are logged and discarded.
 
 ### Events — `energy/nodes/{node_id}/events`
 
@@ -130,7 +130,7 @@ The payload must contain **exactly** these six fields — no extra fields, no mi
 | `health` | Every 60 seconds |
 | `events` | On occurrence only |
 
-Higher frequency is supported but not needed — the pipeline processes at 60-second granularity. Publishing faster wastes bandwidth without benefit.
+Higher frequency is supported but not needed. The pipeline processes at 60 second granularity. Publishing faster wastes bandwidth without benefit.
 
 ---
 
@@ -190,9 +190,3 @@ E2 ingestion service
    ```sql
    SELECT * FROM telemetry_readings WHERE node_id = 'test_node_001';
    ```
-
----
-
-## Contact
-
-E2 team: Tharupahan Jayawardana (architecture), Jitharsanan Thiruketheeswaran (ingestion/storage)
