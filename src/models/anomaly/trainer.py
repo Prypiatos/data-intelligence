@@ -1,5 +1,9 @@
 """
-Train the anomaly detection model against mock energy readings.
+Train the anomaly detection model against UCI household power consumption data.
+
+Dataset: UCI Individual Household Electric Power Consumption
+Place the raw file at: data/uci-household-power.txt
+Download: https://archive.ics.uci.edu/dataset/235/individual+household+electric+power+consumption
 
 Usage:
     python -m src.models.anomaly.trainer
@@ -10,47 +14,56 @@ MLflow UI:
 """
 
 import os
-import random
-import time
 from pathlib import Path
 
 import mlflow  # type: ignore[attr-defined]
 import numpy as np
+import pandas as pd
 
 from .model import AnomalyDetector
 
 EXPERIMENT_NAME = "anomaly-detection"
 MODEL_OUTPUT_DIR = Path("models/anomaly")
+UCI_DATA_PATH = Path("data/uci-household-power.txt")
 
-# Mirrors E1 telemetry schema (issue #6)
-_NODE_TYPES = ["plug", "circuit", "main"]
-_NODE_IDS = [f"{t}-{i:02d}" for t in _NODE_TYPES for i in range(1, 6)]
+# Single household — treat as one node
+_NODE_ID = "uci-household-main"
 
 
-def _generate_mock_readings(n: int = 300, anomaly_fraction: float = 0.05) -> list[dict]:
-    rng = random.Random(42)
+def _load_uci_readings(path: Path) -> list[dict]:
+    """Load and map UCI dataset columns to our telemetry schema."""
+    df = pd.read_csv(path, sep=";", low_memory=False)
+
+    # Drop rows with missing values (marked as '?' in the raw file)
+    df = df.replace("?", pd.NA).dropna()
+
+    df["voltage"] = df["Voltage"].astype(float)
+    df["current"] = df["Global_intensity"].astype(float)
+    # Global_active_power is in kW — convert to W
+    df["power"] = df["Global_active_power"].astype(float) * 1000
+    # Sub-metering values are in watt-hours per minute; sum all three circuits
+    df["energy_wh"] = (
+        df["Sub_metering_1"].astype(float)
+        + df["Sub_metering_2"].astype(float)
+        + df["Sub_metering_3"].astype(float)
+    )
+    df["timestamp"] = (
+        pd.to_datetime(df["Date"] + " " + df["Time"], dayfirst=True).astype("int64")
+        // 10**6
+    )  # epoch ms
+
     readings = []
-    base_ts = int(time.time() * 1000) - n * 60_000
-
-    for i in range(n):
-        is_anomaly = rng.random() < anomaly_fraction
-        voltage = rng.uniform(220, 240)
-        if is_anomaly:
-            # Simulate theft (unusually high current) or leakage (low voltage drop)
-            current = rng.uniform(15, 30)
-            power = voltage * current * rng.uniform(0.3, 0.5)
-        else:
-            current = rng.uniform(0.5, 10)
-            power = voltage * current * rng.uniform(0.85, 0.99)
-
+    for row in df[["timestamp", "voltage", "current", "power", "energy_wh"]].itertuples(
+        index=False
+    ):
         readings.append(
             {
-                "node_id": rng.choice(_NODE_IDS),
-                "timestamp": base_ts + i * 60_000,
-                "voltage": round(voltage, 2),
-                "current": round(current, 3),
-                "power": round(power, 2),
-                "energy_wh": round(power / 60, 4),
+                "node_id": _NODE_ID,
+                "timestamp": int(row.timestamp),
+                "voltage": round(row.voltage, 2),
+                "current": round(row.current, 3),
+                "power": round(row.power, 2),
+                "energy_wh": round(row.energy_wh, 4),
             }
         )
 
@@ -75,13 +88,22 @@ def _compute_metrics(predictions: list[dict]) -> dict:
 def train(
     contamination: float = 0.05,
     n_estimators: int = 100,
-    n_readings: int = 300,
+    data_path: Path = UCI_DATA_PATH,
     output_dir: Path = MODEL_OUTPUT_DIR,
 ) -> AnomalyDetector:
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))  # type: ignore[attr-defined]
+    if not data_path.exists():
+        raise FileNotFoundError(
+            f"UCI dataset not found at {data_path}. "
+            "Download from https://archive.ics.uci.edu/dataset/235/individual+household+electric+power+consumption "
+            "and place it at data/uci-household-power.txt"
+        )
+
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))  # type: ignore[attr-defined]
     mlflow.set_experiment(EXPERIMENT_NAME)  # type: ignore[attr-defined]
 
-    readings = _generate_mock_readings(n=n_readings, anomaly_fraction=contamination)
+    print(f"Loading UCI dataset from {data_path} ...")
+    readings = _load_uci_readings(data_path)
+    print(f"Loaded {len(readings):,} readings after dropping missing values")
 
     with mlflow.start_run():  # type: ignore[attr-defined]
         detector = AnomalyDetector(
@@ -89,8 +111,9 @@ def train(
         )
         detector.fit(readings)
 
-        mlflow.log_params({**detector.params, "n_readings": n_readings})  # type: ignore[attr-defined]
+        mlflow.log_params({**detector.params, "n_readings": len(readings), "dataset": "uci-household-power"})  # type: ignore[attr-defined]
 
+        print("Scoring readings ...")
         predictions = detector.predict(readings)
         metrics = _compute_metrics(predictions)
         mlflow.log_metrics(metrics)  # type: ignore[attr-defined]
