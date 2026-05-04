@@ -3,7 +3,7 @@ Train the anomaly detection model against UCI household power consumption data.
 
 Dataset: UCI Individual Household Electric Power Consumption
 Place the raw file at: data/uci-household-power.txt
-Download: https://archive.ics.uci.edu/dataset/235/individual+household+electric+power+consumption
+Download: https://archive.ics.uci.edu/static/public/235/individual+household+electric+power+consumption.zip
 
 Usage:
     python -m src.models.anomaly.trainer
@@ -94,8 +94,8 @@ def train(
     if not data_path.exists():
         raise FileNotFoundError(
             f"UCI dataset not found at {data_path}. "
-            "Download from https://archive.ics.uci.edu/dataset/235/individual+household+electric+power+consumption "
-            "and place it at data/uci-household-power.txt"
+            "Download from https://archive.ics.uci.edu/static/public/235/individual+household+electric+power+consumption.zip "
+            "and place the extracted .txt file at data/uci-household-power.txt"
         )
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))  # type: ignore[attr-defined]
