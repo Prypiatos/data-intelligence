@@ -25,4 +25,6 @@ def get_recommendations(engine: Engine = Depends(get_db_engine)):
     try:
         return run_recommendations(engine=engine)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to generate recommendations: {e}")
+        raise HTTPException(
+            status_code=503, detail=f"Failed to generate recommendations: {e}"
+        )

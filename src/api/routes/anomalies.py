@@ -21,7 +21,9 @@ class AnomalyRecord(BaseModel):
 @router.get("", response_model=List[AnomalyRecord])
 def get_anomalies(
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
-    severity: Optional[str] = Query(None, description="Filter by severity: high, medium, normal"),
+    severity: Optional[str] = Query(
+        None, description="Filter by severity: high, medium, normal"
+    ),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     engine: Engine = Depends(get_db_engine),
 ):
