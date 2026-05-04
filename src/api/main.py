@@ -11,11 +11,31 @@ Architecture:
 - routes/: Other teams add their modules here without conflicts
 """
 
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules from other teams
 from src.api.routes import forecasting, health
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("\n" + "=" * 80)
+    print("Energy Management System API Startup")
+    print("=" * 80)
+
+    forecasting.initialize_forecasting()
+
+    print("\nAll systems initialized successfully!")
+    print("=" * 80 + "\n")
+
+    yield
+
+    print("\nEnergy Management System API Shutting Down\n")
+
 
 # ============================================
 # Create FastAPI Application
@@ -26,17 +46,19 @@ app = FastAPI(
     description="API for the E2 Data & Intelligence team - Forecasting, ingestion, streaming, and more",
     version="1.0.0",
     contact={"name": "E2 Data & Intelligence Team", "email": "e2@prypiatos.com"},
+    lifespan=lifespan,
 )
 
 # ============================================
 # CORS Configuration
 # ============================================
 
-# Allow other teams (E1, E3, E4) to call our API from different domains
-# CORS = Cross-Origin Resource Sharing
+_cors_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+_allow_origins = [o.strip() for o in _cors_origins if o.strip()] or ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific domains
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,11 +86,6 @@ app.include_router(forecasting.router)
 
 @app.get("/")
 def root():
-    """
-    Root endpoint with API information.
-
-    Returns basic information about the API and links to documentation.
-    """
     return {
         "name": "Energy Management System API",
         "version": "1.0.0",
@@ -84,42 +101,10 @@ def root():
 
 
 # ============================================
-# Startup and Shutdown Events
-# ============================================
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Run when the API starts up.
-
-    Initialize all modules and load models. This runs once when the
-    Docker container starts, not on every request.
-    """
-    print("\n" + "=" * 80)
-    print("🚀 Energy Management System API Startup")
-    print("=" * 80)
-
-    # Initialize forecasting model
-    # This calls the initialize_forecasting function in forecasting.py
-    forecasting.initialize_forecasting()
-
-    print("\n✅ All systems initialized successfully!")
-    print("=" * 80 + "\n")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run when the API shuts down (cleanup)."""
-    print("\n🛑 Energy Management System API Shutting Down\n")
-
-
-# ============================================
 # Entry Point
 # ============================================
 
 if __name__ == "__main__":
-    # This allows running the app directly: python src/api/main.py
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

@@ -1,10 +1,12 @@
+import os
+
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-url = "http://localhost:8086"
-token = "energy-token-123"
-org = "energy-org"
-bucket = "energy_telemetry"
+url = os.getenv("INFLUXDB_URL", "http://influxdb:8086")
+token = os.getenv("INFLUXDB_TOKEN", "energy-token-123")
+org = os.getenv("INFLUXDB_ORG", "energy-org")
+bucket = os.getenv("INFLUXDB_BUCKET", "energy_telemetry")
 
 client = InfluxDBClient(url=url, token=token, org=org)
 
