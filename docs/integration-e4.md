@@ -23,6 +23,8 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 | `streaming` | `docker/Dockerfile.streaming` | PyFlink stream processing job |
 | `airflow` | `docker/Dockerfile.airflow` | Airflow scheduler + webserver (model retraining DAGs) |
 
+> `docker/Dockerfile.batch-pipeline` also exists — this is a Spark batch image used by Airflow task runners, not a long-running service. It has no compose entry and is not deployed standalone.
+
 ### Third-party images (no build required)
 
 | Service | Image | Role |
@@ -41,29 +43,34 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 
 ## Startup order
 
-Services have hard dependencies — bring them up in this order:
+Services have hard `depends_on` conditions — bring them up in this order:
 
 ```
 zookeeper
     └── kafka (waits for zookeeper)
             └── kafka-init (one-shot: creates topics, exits)
-                    ├── ingestion
-                    ├── storage
-                    ├── anomaly
+                    ├── ingestion  (also needs mosquitto healthy)
+                    ├── storage    (also needs postgres + influxdb healthy)
+                    ├── anomaly    (also needs postgres healthy)
                     └── streaming
 
-postgres ──────────────────────────────────────┐
-mosquitto                                       ├── api
-influxdb                                        ├── storage
-redis                                           ├── anomaly
-                                                ├── mlflow
-                                                └── airflow
+postgres ──────────┬── mlflow
+                   ├── airflow
+                   ├── storage
+                   ├── anomaly
+                   └── api ←── also needs kafka + influxdb + redis healthy
+
+mosquitto ─────────── ingestion
+
+influxdb ──────────── storage, api
+
+redis ─────────────── api
 
 flink-jobmanager
     └── flink-taskmanager
 ```
 
-`kafka-init` is a one-shot init container — it creates Kafka topics and exits. All stream consumers depend on it completing successfully before starting.
+`kafka-init` is a one-shot init container — it creates Kafka topics and exits with code 0. All stream consumers (`ingestion`, `storage`, `anomaly`, `streaming`) wait for it to complete before starting.
 
 ---
 
@@ -82,43 +89,43 @@ flink-jobmanager
 | `airflow` | 8080 | **8081** | Admin UI |
 | `flink-jobmanager` | 8081 | **8082** | Admin UI |
 
-**Externally reachable in production:** port 8000 (API for E3) and port 1883 (MQTT for E1 devices). Everything else should be internal-only.
+**Externally reachable in production:** port 8000 (API for E3) and port 1883 (MQTT for E1 devices). Everything else should be internal-only behind the network boundary.
 
-> **macOS note:** Port 5000 conflicts with AirPlay. MLflow is mapped to 5001 — keep this in production or pick any free port.
+> **macOS note:** Port 5000 conflicts with AirPlay — MLflow is mapped to 5001. In production use any free port.
 
 ---
 
 ## Environment variables
 
-Create a `.env` file (or equivalent secrets store). All services load from it via `env_file: .env`.
+Create a `.env` file (or inject via secrets manager). All custom services load from it via `env_file: .env`.
 
-### Required — change these in production
+### Required — change all of these in production
 
-| Variable | Default (dev) | Description |
+| Variable | Dev default | Description |
 |---|---|---|
-| `POSTGRES_PASSWORD` | `energy_pass` | PostgreSQL password — **change this** |
+| `POSTGRES_PASSWORD` | `energy_pass` | PostgreSQL password |
 | `POSTGRES_USER` | `energy_user` | PostgreSQL user |
 | `POSTGRES_DB` | `energy_db` | PostgreSQL database name |
-| `DOCKER_INFLUXDB_INIT_PASSWORD` | `admin12345` | InfluxDB admin password — **change this** |
-| `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN` | `energy-token-123` | InfluxDB API token — **change this** |
-| `AIRFLOW_ADMIN_PASSWORD` | `changeme` | Airflow admin UI password — **change this** |
+| `DOCKER_INFLUXDB_INIT_PASSWORD` | `admin12345` | InfluxDB admin password |
+| `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN` | `energy-token-123` | InfluxDB init token |
+| `INFLUXDB_TOKEN` | `your-influxdb-token` | Token used by app services to write to InfluxDB — must match the init token |
+| `AIRFLOW_ADMIN_PASSWORD` | `changeme` | Airflow admin UI password |
 
-### Required — set for production environment
+### Set for production environment
 
 | Variable | Description |
 |---|---|
-| `KAFKA_ADVERTISED_LISTENERS` | Set the `EXTERNAL://` listener to the server's public IP/hostname so external clients can reach Kafka if needed. Example: `INTERNAL://kafka:29092,EXTERNAL://<server-ip>:9092` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins for the API (E3's frontend URL). Default allows all. |
-| `MLFLOW_TRACKING_URI` | Set to `http://mlflow:5000` (internal) — already correct |
+| `KAFKA_ADVERTISED_LISTENERS` | Update the `EXTERNAL://` listener to the server's real IP/hostname. Dev value is `EXTERNAL://localhost:9092` which only works locally. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins for the API (E3's frontend URL). Default allows all origins. |
 
 ### Optional tuning
 
 | Variable | Default | Description |
 |---|---|---|
-| `INFLUXDB_TOKEN` | `energy-token-123` | Token for InfluxDB writes from ingestion/storage services |
 | `LOG_LEVEL` | `INFO` | Set to `WARNING` in production to reduce log volume |
 | `FORECAST_HORIZON_HOURS` | `24` | Hours ahead to forecast |
 | `HIGH_CONSUMPTION_THRESHOLD` | `800` | Watts threshold for high-consumption recommendations |
+| `MLFLOW_TRACKING_URI` | `http://mlflow:5000` | Already correct for internal Docker networking |
 
 ---
 
@@ -128,16 +135,18 @@ Create a `.env` file (or equivalent secrets store). All services load from it vi
 |---|---|---|
 | `postgres_data` | postgres | All relational data (telemetry, anomalies, forecasts, MLflow metadata) |
 | `influxdb_data` | influxdb | Time-series metrics |
-| `redis_data` | redis | Cache (ephemeral — safe to lose) |
+| `redis_data` | redis | Cache (ephemeral — safe to lose on restart) |
 | `kafka_data` | kafka | Message log |
 | `zookeeper_data` / `zookeeper_logs` | zookeeper | Kafka coordination state |
 | `flink_data` | flink-jobmanager, flink-taskmanager | Flink checkpoints |
 | `mlflow_artifacts` | mlflow | Model artifacts, experiment files |
 | `mosquitto_data` / `mosquitto_logs` | mosquitto | MQTT persistence and logs |
 | `airflow_data` | airflow | DAG run data |
-| `./models` (bind mount) | api, anomaly, airflow | LSTM model file (`lstm_model.pth`), anomaly detector (`detector.pkl`) |
+| `./models` (bind mount) | api, anomaly, airflow | Trained model files |
 
-**The `./models` bind mount is critical.** The API loads the LSTM model from `models/lstm_model.pth` at startup. Airflow writes updated model files here after each retraining run. In production, replace this bind mount with a shared persistent volume accessible to both the `api` and `airflow` containers.
+**The `./models` bind mount is critical.** The API loads the LSTM model from `models/lstm_model.pth` at startup. Airflow writes updated model files to `models/` after each retraining run. In production, replace this bind mount with a named shared persistent volume accessible to both `api` and `airflow`.
+
+**Dev-only bind mount to remove:** `streaming` also mounts the entire repo (`.:/app`) in `docker-compose.yml` for hot-reloading. Remove this in production — the image already contains the source code.
 
 ---
 
@@ -148,7 +157,7 @@ PostgreSQL schema is auto-applied on first start via:
 ./db/postgres/schema.sql → /docker-entrypoint-initdb.d/01-schema.sql
 ```
 
-This only runs on a **fresh data volume**. If `postgres_data` already exists, the schema is not re-applied. If you need to re-initialise, drop the volume first:
+This only runs on a **fresh data volume**. If `postgres_data` already exists, the init script does not re-run. To re-initialise:
 ```bash
 docker volume rm <project>_postgres_data
 ```
@@ -157,9 +166,10 @@ docker volume rm <project>_postgres_data
 
 ## Health checks
 
-| Service | Health check endpoint |
+Container-level Docker healthchecks are configured for:
+
+| Service | Method |
 |---|---|
-| `api` | `GET /health` → `{"status": "healthy"}` |
 | `postgres` | `pg_isready` |
 | `influxdb` | `GET /ping` |
 | `redis` | `redis-cli ping` |
@@ -167,6 +177,10 @@ docker volume rm <project>_postgres_data
 | `mosquitto` | `mosquitto_pub` test publish |
 | `flink-jobmanager` | `GET /overview` |
 | `flink-taskmanager` | `GET /taskmanagers` via jobmanager |
+
+These services do **not** have container-level Docker healthchecks and should be monitored externally: `api`, `ingestion`, `storage`, `anomaly`, `streaming`, `mlflow`, `airflow`.
+
+The API does expose `GET /health` → `{"status": "healthy"}` which can be used as a load balancer health probe.
 
 ---
 
@@ -179,6 +193,7 @@ docker compose build
 # Build a specific image
 docker compose build api
 docker compose build ingestion
+docker compose build storage
 docker compose build anomaly
 docker compose build streaming
 docker compose build airflow
@@ -203,42 +218,41 @@ Image names produced:
 | `energy.telemetry` | ingestion | storage, anomaly, streaming |
 | `energy.telemetry.results` | streaming | storage |
 
-Partitions: 1. Replication factor: 1 (increase for HA).
-
----
-
-## Model files
-
-The API and anomaly service require pre-trained model files at startup:
-
-| File | Used by | What happens without it |
-|---|---|---|
-| `models/lstm_model.pth` | api | API starts with an untrained model — `/forecast/predict` returns low-quality predictions |
-| `models/anomaly/detector.pkl` | anomaly | Anomaly pipeline trains a fresh model on first run using available data |
-
-Trigger the Airflow `model_retraining` DAG after first boot to generate `lstm_model.pth`. The anomaly detector self-bootstraps.
+Partitions: 1. Replication factor: 1 (increase both for HA).
 
 ---
 
 ## Airflow DAGs
 
-| DAG | Schedule | What it does |
+| DAG ID | Schedule | What it does |
 |---|---|---|
-| `model_retraining` | Weekly (configurable) | Retrains LSTM forecasting model, logs to MLflow, saves to `models/` |
-| `energy_batch_pipeline` | Daily | Aggregates telemetry into analytics tables |
-| `data_validation` | Daily | Validates data quality in PostgreSQL |
+| `model_retraining_pipeline` | Weekly (Mon 02:00) | Retrains LSTM forecasting model, logs to MLflow, saves to `models/` |
+| `energy_batch_pipeline` | Daily (01:00) | Runs Spark feature engineering and batch analytics |
+| `data_validation_dag` | Daily | Validates data quality in PostgreSQL |
 
-Airflow admin UI: `http://<host>:8081` — default credentials set via `AIRFLOW_ADMIN_PASSWORD`.
+Airflow admin UI: `http://<host>:8081` — credentials set via `AIRFLOW_ADMIN_PASSWORD`.
+
+Trigger the `model_retraining_pipeline` DAG manually after first boot to generate the initial `lstm_model.pth` before the API serves predictions.
+
+---
+
+## Model files
+
+| File | Used by | What happens without it |
+|---|---|---|
+| `models/lstm_model.pth` | api | API starts but serves low-quality predictions until the model is trained |
+| `models/anomaly/detector.pkl` | anomaly | Anomaly pipeline trains a fresh model on first run from available data |
 
 ---
 
 ## Known constraints
 
-- **Kafka `EXTERNAL` listener**: In `docker-compose.yml` the external listener advertises `localhost:9092`. In production, update `KAFKA_ADVERTISED_LISTENERS` to use the server's real IP/hostname so services outside Docker can connect.
-- **Single-node Kafka**: `KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1`. For HA, increase broker count and replication factor.
-- **Flink local mode**: The `streaming` container runs PyFlink in local mini-cluster mode — it does not submit jobs to the `flink-jobmanager`. The Flink cluster containers are available for future job submission.
-- **No TLS**: MQTT and API are unencrypted. Terminate TLS at a load balancer/ingress in production.
-- **Model bind mount**: The `./models` directory is bind-mounted. Replace with a named shared volume in production.
+- **Kafka external listener**: Dev config advertises `localhost:9092` as the external address. Update `KAFKA_ADVERTISED_LISTENERS` with the server's real IP before deploying.
+- **Single-node Kafka**: `KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1`. Increase broker count and replication factor for HA.
+- **Flink local mode**: The `streaming` container runs PyFlink in local mini-cluster mode — it does not submit jobs to the `flink-jobmanager`. The Flink cluster is available for future job submission.
+- **No TLS**: MQTT (1883) and API (8000) are unencrypted. Terminate TLS at a load balancer or ingress in production.
+- **Streaming bind mount**: `streaming` mounts `.:/app` in compose — dev only. Remove in production.
+- **Model volume**: `./models` is a bind mount in compose. Replace with a named shared volume in production so `api` and `airflow` can both access it.
 
 ---
 
