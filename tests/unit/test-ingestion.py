@@ -15,13 +15,14 @@ sys.modules["kafka"] = mock_kafka
 
 mock_db_writer = types.ModuleType("db_writer")
 mock_db_writer.insert_telemetry = Mock()  # type: ignore[attr-defined]
+mock_db_writer.insert_stream_summary = Mock()  # type: ignore[attr-defined]
 sys.modules["db_writer"] = mock_db_writer
 
 mock_influx_writer = types.ModuleType("influx_writer")
 mock_influx_writer.write_telemetry = Mock()  # type: ignore[attr-defined]
 sys.modules["influx_writer"] = mock_influx_writer
 
-from kafka_consumer import process_telemetry  # noqa: E402
+from kafka_consumer import consume_stream_results, process_telemetry  # noqa: E402
 from validator import validate_telemetry  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -188,3 +189,67 @@ def test_embedded_timestamp_is_preserved(mock_insert, mock_write):
 
     assert mock_insert.call_args.args[0]["timestamp"] == 1777000000000
     assert mock_write.call_args.args[0]["timestamp"] == 1777000000000
+
+
+# ---------------------------------------------------------------------------
+# consume_stream_results — stream summary persistence
+# ---------------------------------------------------------------------------
+
+
+def _stream_summary():
+    return {
+        "node_id": "plug_01",
+        "window_start": 1777392330000,
+        "window_end": 1777392332000,
+        "avg_power": 345.0,
+        "max_power": 380.0,
+        "record_count": 4,
+    }
+
+
+def _make_message(value):
+    msg = Mock()
+    msg.value = value
+    return msg
+
+
+@patch("kafka_consumer.insert_stream_summary")
+@patch("kafka_consumer.create_results_consumer")
+def test_consume_stream_results_inserts_and_commits(mock_create, mock_insert):
+    summary = _stream_summary()
+    mock_insert.return_value = True
+    mock_consumer = Mock()
+    mock_consumer.__iter__ = Mock(return_value=iter([_make_message(summary)]))
+    mock_create.return_value = mock_consumer
+
+    consume_stream_results()
+
+    mock_insert.assert_called_once_with(summary)
+    mock_consumer.commit.assert_called_once()
+
+
+@patch("kafka_consumer.insert_stream_summary")
+@patch("kafka_consumer.create_results_consumer")
+def test_consume_stream_results_skips_commit_on_insert_failure(mock_create, mock_insert):
+    mock_insert.return_value = None
+    mock_consumer = Mock()
+    mock_consumer.__iter__ = Mock(return_value=iter([_make_message(_stream_summary())]))
+    mock_create.return_value = mock_consumer
+
+    consume_stream_results()
+
+    mock_insert.assert_called_once()
+    mock_consumer.commit.assert_not_called()
+
+
+@patch("kafka_consumer.insert_stream_summary")
+@patch("kafka_consumer.create_results_consumer")
+def test_consume_stream_results_handles_exception_without_crashing(mock_create, mock_insert):
+    mock_insert.side_effect = Exception("unexpected error")
+    mock_consumer = Mock()
+    mock_consumer.__iter__ = Mock(return_value=iter([_make_message(_stream_summary())]))
+    mock_create.return_value = mock_consumer
+
+    consume_stream_results()  # must not raise
+
+    mock_consumer.commit.assert_not_called()

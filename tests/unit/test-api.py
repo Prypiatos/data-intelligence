@@ -398,3 +398,64 @@ class TestGetRecommendations:
             side_effect=Exception("db error"),
         ):
             assert client.get("/recommendations").status_code == 503
+
+
+# ============================================================
+# GET /stream/summary
+# ============================================================
+
+
+STREAM_ROWS = [
+    {
+        "node_id": "node_001",
+        "window_start": 1714800000000,
+        "window_end": 1714800002000,
+        "avg_power": 487.3,
+        "max_power": 512.1,
+        "record_count": 4,
+    },
+    {
+        "node_id": "node_002",
+        "window_start": 1714800000000,
+        "window_end": 1714800002000,
+        "avg_power": 310.0,
+        "max_power": 340.0,
+        "record_count": 2,
+    },
+]
+
+
+class TestGetStreamSummary:
+    def test_returns_200(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(STREAM_ROWS)
+        assert client.get("/stream/summary").status_code == 200
+
+    def test_returns_list(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(STREAM_ROWS)
+        data = client.get("/stream/summary").json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+
+    def test_response_schema(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(STREAM_ROWS)
+        record = client.get("/stream/summary").json()[0]
+        assert "node_id" in record
+        assert "window_start" in record
+        assert "window_end" in record
+        assert "avg_power" in record
+        assert "max_power" in record
+        assert "record_count" in record
+
+    def test_node_id_filter_passes_param(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([STREAM_ROWS[0]])
+        data = client.get("/stream/summary?node_id=node_001").json()
+        assert len(data) == 1
+        assert data[0]["node_id"] == "node_001"
+
+    def test_empty_list_when_no_data(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([])
+        assert client.get("/stream/summary").json() == []
+
+    def test_returns_503_on_db_error(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override_error()
+        assert client.get("/stream/summary").status_code == 503

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -35,7 +35,9 @@ def get_stream_summary(
 
     query += " ORDER BY window_start DESC LIMIT :limit"
 
-    with engine.connect() as conn:
-        rows = conn.execute(text(query), params).mappings().all()
-
-    return [dict(row) for row in rows]
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(query), params).mappings().all()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database error: {e}")

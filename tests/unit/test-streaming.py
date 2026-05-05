@@ -110,14 +110,33 @@ def test_summarize_window_returns_window_bounds_and_record_count():
     context.window.return_value = window
 
     records = [valid_telemetry(), valid_telemetry()]
-    result = transforms.SummarizeWindow().process("all", context, records)
+    result = transforms.SummarizeWindow().process("node_001", context, records)
     summary = json.loads(result[0])
 
-    assert summary == {
-        "window_start": 1000,
-        "window_end": 3000,
-        "record_count": 2,
-    }
+    assert summary["window_start"] == 1000
+    assert summary["window_end"] == 3000
+    assert summary["record_count"] == 2
+    assert summary["node_id"] == "node_001"
+
+
+def test_summarize_window_computes_avg_and_max_power():
+    window = Mock()
+    window.start = 0
+    window.end = 2000
+
+    context = Mock()
+    context.window.return_value = window
+
+    r1 = valid_telemetry()
+    r1["power"] = 400.0
+    r2 = valid_telemetry()
+    r2["power"] = 600.0
+
+    result = transforms.SummarizeWindow().process("node_001", context, [r1, r2])
+    summary = json.loads(result[0])
+
+    assert summary["avg_power"] == 500.0
+    assert summary["max_power"] == 600.0
 
 
 def test_validate_stream_maps_validate_message():
@@ -172,7 +191,7 @@ def test_window_records_uses_constant_key_and_two_second_tumbling_window():
         result = transforms.window_records(stream)
 
     key_function = stream.key_by.call_args.args[0]
-    assert key_function(valid_telemetry()) == "all"
+    assert key_function(valid_telemetry()) == "node_001"
     mock_milliseconds.assert_called_once_with(transforms.WINDOW_SIZE_MS)
     mock_window_of.assert_called_once_with("two_seconds")
     keyed_stream.window.assert_called_once_with("window_spec")
