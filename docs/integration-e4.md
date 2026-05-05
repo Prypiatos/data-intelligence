@@ -45,7 +45,6 @@ Services have hard `depends_on` conditions — bring them up in this order:
 ```
 zookeeper
     └── kafka (waits for zookeeper)
-            └── kafka-init (one-shot: creates topics, exits)
                     ├── ingestion  (also needs mosquitto healthy)
                     ├── storage    (also needs postgres + influxdb healthy)
                     ├── anomaly    (also needs postgres healthy)
@@ -63,7 +62,7 @@ influxdb ──────────── storage, api
 
 ```
 
-`kafka-init` is a one-shot init container — it creates Kafka topics and exits with code 0. All stream consumers (`ingestion`, `storage`, `anomaly`, `streaming`) wait for it to complete before starting.
+Kafka topics are created automatically on first use (`KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`).
 
 ---
 
@@ -197,7 +196,7 @@ Image names produced:
 
 ## Kafka topics
 
-`kafka-init` creates these topics automatically on first boot:
+Topics are created automatically on first use:
 
 | Topic | Producers | Consumers |
 |---|---|---|

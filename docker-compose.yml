@@ -44,21 +44,6 @@ services:
     networks:
       - energy_network
 
-  kafka-init:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka-init
-    depends_on:
-      kafka:
-        condition: service_healthy
-    command:
-      - bash
-      - -c
-      - |
-        echo "Creating kafka topics..."
-        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic energy.telemetry --partitions 1 --replication-factor 1
-        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic energy.telemetry.results --partitions 1 --replication-factor 1
-    networks:
-      - energy_network
 
   mosquitto:
     image: eclipse-mosquitto:2
@@ -122,8 +107,8 @@ services:
       dockerfile: docker/Dockerfile.streaming
     container_name: streaming
     depends_on:
-      kafka-init:
-        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app
@@ -219,8 +204,8 @@ services:
     depends_on:
       mosquitto:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -236,8 +221,8 @@ services:
       dockerfile: docker/Dockerfile.storage
     container_name: energy-storage
     depends_on:
-      kafka-init:
-        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       influxdb:
@@ -258,8 +243,8 @@ services:
       dockerfile: docker/Dockerfile.anomaly
     container_name: energy-anomaly
     depends_on:
-      kafka-init:
-        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     env_file:

@@ -22,8 +22,7 @@ Output topic:
 
 `energy.telemetry.results`
 
-These topics are created automatically by the `kafka-init` service in
-`docker-compose.yml` after Kafka becomes healthy.
+These topics are created automatically on first use (`KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`).
 
 ## Run With Docker
 
@@ -33,8 +32,7 @@ From the `data-intelligence` folder:
 docker compose up streaming
 ```
 
-This starts Kafka dependencies, runs `kafka-init`, and then starts the streaming
-processor.
+This starts Kafka dependencies and then starts the streaming processor.
 
 ## Test Locally
 
