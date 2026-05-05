@@ -72,12 +72,12 @@ Kafka topics are created automatically on first use (`KAFKA_AUTO_CREATE_TOPICS_E
 | `mosquitto` | 1883 | **1883** | E1 devices (MQTT) |
 | `mosquitto` | 9001 | 9001 | MQTT over WebSocket (optional) |
 | `postgres` | 5432 | 5432 | Internal only |
-| `influxdb` | 8086 | 8086 | Internal only |
+| `influxdb` | 8086 | **8086** | E4 Grafana |
 | `kafka` | 9092 | 9092 | Internal only |
 | `mlflow` | 5000 | **5001** | Admin UI |
 | `airflow` | 8080 | **8081** | Admin UI |
 
-**Externally reachable in production:** port 8000 (API for E3) and port 1883 (MQTT for E1 devices). Everything else should be internal-only behind the network boundary.
+**Externally reachable in production:** port 8000 (API for E3), port 1883 (MQTT for E1 devices), and port 8086 (InfluxDB for E4 Grafana). Everything else should be internal-only behind the network boundary.
 
 > **macOS note:** Port 5000 conflicts with AirPlay — MLflow is mapped to 5001. In production use any free port.
 
@@ -96,7 +96,7 @@ Create a `.env` file (or inject via secrets manager). All custom services load f
 | `POSTGRES_DB` | `energy_db` | PostgreSQL database name |
 | `DOCKER_INFLUXDB_INIT_PASSWORD` | `admin12345` | InfluxDB admin password |
 | `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN` | `energy-token-123` | InfluxDB init token |
-| `INFLUXDB_TOKEN` | `your-influxdb-token` | Token used by app services to write to InfluxDB — must match the init token |
+| `INFLUXDB_TOKEN` | `your-influxdb-token` | Token used by app services to write to InfluxDB — **must exactly match `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN`** or writes silently fail |
 | `AIRFLOW_ADMIN_PASSWORD` | `changeme` | Airflow admin UI password |
 
 ### Set for production environment
@@ -238,6 +238,75 @@ Trigger the `model_retraining_pipeline` DAG manually after first boot to generat
 |---|---|---|
 | `models/lstm_model.pth` | api | API starts but serves low-quality predictions until the model is trained |
 | `models/anomaly/detector.pkl` | anomaly | Anomaly pipeline trains a fresh model on first run from available data |
+
+---
+
+## Grafana integration
+
+E4 connects Grafana to two E2 data sources: InfluxDB (raw sensor telemetry) and Prometheus (API metrics).
+
+### InfluxDB data source
+
+| Setting | Value |
+|---|---|
+| URL | `http://influxdb:8086` (if Grafana is on the same Docker network) or `http://<ec2-host>:8086` (if external) |
+| Token | value of `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN` in `.env` |
+| Organisation | `energy-org` |
+| Default bucket | `energy_telemetry` |
+
+**InfluxDB data schema** — what E2 writes:
+
+| Field | Type | Description |
+|---|---|---|
+| Measurement | — | `telemetry` |
+| Tag: `node_id` | string | Device/meter identifier (e.g. `node_001`) |
+| Field: `voltage` | float | Volts |
+| Field: `current` | float | Amps |
+| Field: `power` | float | Watts |
+| Field: `energy_wh` | float | Watt-hours |
+| Timestamp | milliseconds | Unix epoch ms — set `precision` to `ms` in Grafana flux queries |
+
+Example Flux query for power over time per node:
+```flux
+from(bucket: "energy_telemetry")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "telemetry")
+  |> filter(fn: (r) => r._field == "power")
+  |> filter(fn: (r) => r.node_id == "node_001")
+```
+
+**Important:** `INFLUXDB_TOKEN` in `.env` must exactly match `DOCKER_INFLUXDB_INIT_ADMIN_TOKEN`. The `.env.example` ships with a placeholder (`your-influxdb-token`) — if this is not updated before first boot, all E2 writes to InfluxDB will silently fail and Grafana will show an empty bucket.
+
+### Prometheus data source
+
+| Setting | Value |
+|---|---|
+| URL | `http://api:8000` (internal) or `http://<ec2-host>:8000` (external) |
+| Metrics path | `/metrics` |
+
+Use for dashboards showing API request rate, latency, and error rate by endpoint.
+
+Prometheus scrape config (add to E4's `prometheus.yml`):
+```yaml
+scrape_configs:
+  - job_name: e2-api
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: /metrics
+```
+
+### PostgreSQL data source (optional)
+
+Grafana's PostgreSQL plugin can query E2 tables directly for business dashboards:
+
+| Table | Useful for |
+|---|---|
+| `anomaly_records` | Anomaly count per node, severity distribution over time |
+| `stream_summaries` | Near-real-time avg/peak power per node |
+| `forecasts` | Forecast vs actual consumption charts |
+| `telemetry_readings` | Historical raw readings (use with caution — large table) |
+
+Connection details: use the same `POSTGRES_HOST`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` values from `.env`. PostgreSQL port 5432 does **not** need to be publicly exposed — Grafana should be on the same Docker network.
 
 ---
 
