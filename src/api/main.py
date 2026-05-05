@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import route modules from other teams
 from src.api.routes import anomalies, forecasting, health, recommendations
@@ -75,6 +76,8 @@ app.include_router(forecasting.router)
 app.include_router(anomalies.router)
 app.include_router(recommendations.router)
 
+Instrumentator().instrument(app).expose(app)
+
 # When Person 4 creates their API infrastructure routes, they'll add:
 # app.include_router(api_routes.router)
 # When Person 2 creates ingestion routes:
@@ -100,6 +103,7 @@ def root():
             "anomalies": "/anomalies (GET)",
             "recommendations": "/recommendations (GET)",
             "documentation": "/docs (GET)",
+            "metrics": "/metrics (GET)",
         },
         "docs_url": "/docs",
     }
