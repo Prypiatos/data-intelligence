@@ -212,7 +212,7 @@ Topics are created automatically on first use:
 | Topic | Producers | Consumers |
 |---|---|---|
 | `energy.telemetry` | ingestion | storage, anomaly, streaming |
-| `energy.telemetry.results` | streaming | storage |
+| `energy.telemetry.results` | streaming | storage (persists to `stream_summaries`; exposed via `GET /stream/summary`) |
 
 Partitions: 1. Replication factor: 1 (increase both for HA).
 

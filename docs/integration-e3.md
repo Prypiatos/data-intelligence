@@ -126,6 +126,51 @@ Returns energy optimization recommendations derived from anomaly data. Use this 
 
 ---
 
+### GET /stream/summary
+
+Returns per-node power summaries computed by the Flink streaming job over 2-second tumbling windows. Use this to display near-real-time power trends per device.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Max | Description |
+|---|---|---|---|---|
+| `node_id` | string | — | — | Filter to a specific meter/device |
+| `limit` | integer | 100 | 1000 | Max records returned |
+
+**Example request:**
+```
+GET /stream/summary?node_id=node_001&limit=20
+```
+
+**Response `200`:**
+```json
+[
+  {
+    "node_id": "node_001",
+    "window_start": 1714800000000,
+    "window_end": 1714800002000,
+    "avg_power": 487.3,
+    "max_power": 512.1,
+    "record_count": 4
+  }
+]
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `node_id` | string | Device/meter identifier |
+| `window_start` | integer | Unix epoch milliseconds — start of the 2-second window |
+| `window_end` | integer | Unix epoch milliseconds — end of the 2-second window |
+| `avg_power` | float | Average power in watts over the window |
+| `max_power` | float | Peak power in watts over the window |
+| `record_count` | integer | Number of readings that contributed to this window |
+
+Results are ordered newest first. Returns an empty array `[]` if no summaries exist yet.
+
+> **Latency note:** These summaries are computed by the Flink streaming job and written via Kafka. Expect up to ~5 seconds of lag behind live sensor readings.
+
+---
+
 ### GET /forecast/forecasts
 
 Returns stored 24 hour load forecasts from the database. Use this to display forecast charts per node.
@@ -275,6 +320,7 @@ CORS is enabled. If you hit browser CORS errors, share your origin URL with E2 a
 
 | Endpoint | Suggested approach |
 |---|---|
+| `/stream/summary` | Poll every 5–10 s for near-real-time power trends |
 | `/anomalies` | Poll every 30–60 s for live alert feeds |
 | `/recommendations` | Poll every 60 s maximum - generates live on each call |
 | `/forecast/forecasts` | Load once on page load, refresh every few minutes |

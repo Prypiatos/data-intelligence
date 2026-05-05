@@ -52,6 +52,18 @@ CREATE TABLE IF NOT EXISTS anomaly_records (
     severity TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS stream_summaries (
+    id SERIAL PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    window_start BIGINT NOT NULL,
+    window_end BIGINT NOT NULL,
+    avg_power DOUBLE PRECISION NOT NULL,
+    max_power DOUBLE PRECISION NOT NULL,
+    record_count INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (node_id, window_start)
+);
+
 CREATE TABLE IF NOT EXISTS forecasts (
     id SERIAL PRIMARY KEY,
     node_id TEXT NOT NULL,

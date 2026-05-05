@@ -75,22 +75,26 @@ def assign_event_time(stream):
 
 
 def window_records(stream):
-    """Group valid records into 2-second windows."""
-    return stream.key_by(lambda record: "all").window(
+    """Group valid records into 2-second windows per node."""
+    return stream.key_by(lambda record: record["node_id"]).window(
         TumblingEventTimeWindows.of(Time.milliseconds(WINDOW_SIZE_MS))
     )
 
 
 class SummarizeWindow(ProcessWindowFunction):
-    """Build one summary for each time window."""
+    """Build one summary per node per time window."""
 
     def process(self, key, context, elements):
         records = list(elements)
+        powers = [r["power"] for r in records]
         return [
             json.dumps(
                 {
                     "window_start": context.window().start,
                     "window_end": context.window().end,
+                    "node_id": key,
+                    "avg_power": sum(powers) / len(powers),
+                    "max_power": max(powers),
                     "record_count": len(records),
                 }
             )

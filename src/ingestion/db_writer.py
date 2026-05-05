@@ -17,6 +17,36 @@ def _get_conn():
     return _conn
 
 
+def insert_stream_summary(data):
+    try:
+        conn = _get_conn()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO stream_summaries (node_id, window_start, window_end, avg_power, max_power, record_count)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (node_id, window_start) DO NOTHING;
+            """,
+            (
+                data["node_id"],
+                data["window_start"],
+                data["window_end"],
+                data["avg_power"],
+                data["max_power"],
+                data["record_count"],
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as error:
+        try:
+            _get_conn().rollback()
+        except Exception:
+            pass
+        print("WARNING: stream_summary insert failed:", error)
+        return None
+
+
 def insert_telemetry(data):
     try:
         conn = _get_conn()

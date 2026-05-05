@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import route modules from other teams
-from src.api.routes import anomalies, forecasting, health, recommendations
+from src.api.routes import anomalies, forecasting, health, recommendations, streaming
 
 
 @asynccontextmanager
@@ -75,6 +75,7 @@ app.include_router(health.router)
 app.include_router(forecasting.router)
 app.include_router(anomalies.router)
 app.include_router(recommendations.router)
+app.include_router(streaming.router)
 
 Instrumentator().instrument(app).expose(app)
 
@@ -103,6 +104,7 @@ def root():
             "anomalies": "/anomalies (GET)",
             "recommendations": "/recommendations (GET)",
             "documentation": "/docs (GET)",
+            "stream_summary": "/stream/summary (GET)",
             "metrics": "/metrics (GET)",
         },
         "docs_url": "/docs",
