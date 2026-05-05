@@ -32,7 +32,6 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 | `postgres` | `postgres:16` | Primary database |
 | `influxdb` | `influxdb:2.7` | Time-series metrics store |
 | `kafka` | `confluentinc/cp-kafka:7.5.0` | Message broker |
-| `zookeeper` | `confluentinc/cp-zookeeper:7.5.0` | Kafka coordination |
 | `mosquitto` | `eclipse-mosquitto:2` | MQTT broker (E1 devices connect here) |
 | `mlflow` | `ghcr.io/mlflow/mlflow` | ML experiment tracking |
 
@@ -43,8 +42,7 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 Services have hard `depends_on` conditions — bring them up in this order:
 
 ```
-zookeeper
-    └── kafka (waits for zookeeper)
+kafka
                     ├── ingestion  (also needs mosquitto healthy)
                     ├── storage    (also needs postgres + influxdb healthy)
                     ├── anomaly    (also needs postgres healthy)
@@ -126,7 +124,6 @@ Create a `.env` file (or inject via secrets manager). All custom services load f
 | `postgres_data` | postgres | All relational data (telemetry, anomalies, forecasts, MLflow metadata) |
 | `influxdb_data` | influxdb | Time-series metrics |
 | `kafka_data` | kafka | Message log |
-| `zookeeper_data` / `zookeeper_logs` | zookeeper | Kafka coordination state |
 | `mlflow_artifacts` | mlflow | Model artifacts, experiment files |
 | `mosquitto_data` / `mosquitto_logs` | mosquitto | MQTT persistence and logs |
 | `airflow_data` | airflow | DAG run data |

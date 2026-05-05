@@ -1,7 +1,7 @@
 """Integration tests for the full Kafka ingestion pipeline (issue #34).
 
 Requires all services running:
-    docker compose up -d zookeeper kafka mosquitto postgres influxdb
+    docker compose up -d kafka mosquitto postgres influxdb
 
 And the ingestion consumers running:
     python3 src/ingestion/mqtt_consumer.py
