@@ -111,7 +111,7 @@ class TestAnomalies:
 
     def test_data_integrity_severity_values(self, api):
         data = api.get("/anomalies?limit=100").json()
-        valid = {"high", "medium", "normal"}
+        valid = {"high", "medium", "low"}
         for record in data:
             assert record["severity"] in valid
 

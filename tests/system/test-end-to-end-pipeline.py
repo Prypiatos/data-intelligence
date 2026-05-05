@@ -257,7 +257,7 @@ class TestAnomalyPipeline:
             )
             severities = {row[0] for row in cur.fetchall()}
         conn.close()
-        valid = {"high", "medium", "normal"}
+        valid = {"high", "medium", "low"}
         assert severities <= valid
 
 
