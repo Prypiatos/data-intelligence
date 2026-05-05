@@ -31,7 +31,6 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 |---|---|---|
 | `postgres` | `postgres:16` | Primary database |
 | `influxdb` | `influxdb:2.7` | Time-series metrics store |
-| `redis` | `redis:7` | Cache |
 | `kafka` | `confluentinc/cp-kafka:7.5.0` | Message broker |
 | `zookeeper` | `confluentinc/cp-zookeeper:7.5.0` | Kafka coordination |
 | `mosquitto` | `eclipse-mosquitto:2` | MQTT broker (E1 devices connect here) |
@@ -58,13 +57,12 @@ postgres ──────────┬── mlflow
                    ├── airflow
                    ├── storage
                    ├── anomaly
-                   └── api ←── also needs kafka + influxdb + redis healthy
+                   └── api ←── also needs kafka + influxdb healthy
 
 mosquitto ─────────── ingestion
 
 influxdb ──────────── storage, api
 
-redis ─────────────── api
 
 flink-jobmanager
     └── flink-taskmanager
@@ -83,7 +81,6 @@ flink-jobmanager
 | `mosquitto` | 9001 | 9001 | MQTT over WebSocket (optional) |
 | `postgres` | 5432 | 5432 | Internal only |
 | `influxdb` | 8086 | 8086 | Internal only |
-| `redis` | 6379 | 6379 | Internal only |
 | `kafka` | 9092 | 9092 | Internal only |
 | `mlflow` | 5000 | **5001** | Admin UI |
 | `airflow` | 8080 | **8081** | Admin UI |
@@ -135,7 +132,6 @@ Create a `.env` file (or inject via secrets manager). All custom services load f
 |---|---|---|
 | `postgres_data` | postgres | All relational data (telemetry, anomalies, forecasts, MLflow metadata) |
 | `influxdb_data` | influxdb | Time-series metrics |
-| `redis_data` | redis | Cache (ephemeral — safe to lose on restart) |
 | `kafka_data` | kafka | Message log |
 | `zookeeper_data` / `zookeeper_logs` | zookeeper | Kafka coordination state |
 | `flink_data` | flink-jobmanager, flink-taskmanager | Flink checkpoints |
@@ -172,7 +168,6 @@ Container-level Docker healthchecks are configured for:
 |---|---|
 | `postgres` | `pg_isready` |
 | `influxdb` | `GET /ping` |
-| `redis` | `redis-cli ping` |
 | `kafka` | `kafka-broker-api-versions` |
 | `mosquitto` | `mosquitto_pub` test publish |
 | `flink-jobmanager` | `GET /overview` |
