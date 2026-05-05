@@ -35,8 +35,6 @@ E2 owns the application code, Dockerfiles, and a `docker-compose.yml` for local 
 | `zookeeper` | `confluentinc/cp-zookeeper:7.5.0` | Kafka coordination |
 | `mosquitto` | `eclipse-mosquitto:2` | MQTT broker (E1 devices connect here) |
 | `mlflow` | `ghcr.io/mlflow/mlflow` | ML experiment tracking |
-| `flink-jobmanager` | `flink:1.17.1-scala_2.12-java11` | Flink cluster job manager |
-| `flink-taskmanager` | `flink:1.17.1-scala_2.12-java11` | Flink cluster task manager |
 
 ---
 
@@ -63,9 +61,6 @@ mosquitto ─────────── ingestion
 
 influxdb ──────────── storage, api
 
-
-flink-jobmanager
-    └── flink-taskmanager
 ```
 
 `kafka-init` is a one-shot init container — it creates Kafka topics and exits with code 0. All stream consumers (`ingestion`, `storage`, `anomaly`, `streaming`) wait for it to complete before starting.
@@ -84,7 +79,6 @@ flink-jobmanager
 | `kafka` | 9092 | 9092 | Internal only |
 | `mlflow` | 5000 | **5001** | Admin UI |
 | `airflow` | 8080 | **8081** | Admin UI |
-| `flink-jobmanager` | 8081 | **8082** | Admin UI |
 
 **Externally reachable in production:** port 8000 (API for E3) and port 1883 (MQTT for E1 devices). Everything else should be internal-only behind the network boundary.
 
@@ -134,7 +128,6 @@ Create a `.env` file (or inject via secrets manager). All custom services load f
 | `influxdb_data` | influxdb | Time-series metrics |
 | `kafka_data` | kafka | Message log |
 | `zookeeper_data` / `zookeeper_logs` | zookeeper | Kafka coordination state |
-| `flink_data` | flink-jobmanager, flink-taskmanager | Flink checkpoints |
 | `mlflow_artifacts` | mlflow | Model artifacts, experiment files |
 | `mosquitto_data` / `mosquitto_logs` | mosquitto | MQTT persistence and logs |
 | `airflow_data` | airflow | DAG run data |
@@ -170,8 +163,6 @@ Container-level Docker healthchecks are configured for:
 | `influxdb` | `GET /ping` |
 | `kafka` | `kafka-broker-api-versions` |
 | `mosquitto` | `mosquitto_pub` test publish |
-| `flink-jobmanager` | `GET /overview` |
-| `flink-taskmanager` | `GET /taskmanagers` via jobmanager |
 
 These services do **not** have container-level Docker healthchecks and should be monitored externally: `api`, `ingestion`, `storage`, `anomaly`, `streaming`, `mlflow`, `airflow`.
 
@@ -244,7 +235,6 @@ Trigger the `model_retraining_pipeline` DAG manually after first boot to generat
 
 - **Kafka external listener**: Dev config advertises `localhost:9092` as the external address. Update `KAFKA_ADVERTISED_LISTENERS` with the server's real IP before deploying.
 - **Single-node Kafka**: `KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1`. Increase broker count and replication factor for HA.
-- **Flink local mode**: The `streaming` container runs PyFlink in local mini-cluster mode — it does not submit jobs to the `flink-jobmanager`. The Flink cluster is available for future job submission.
 - **No TLS**: MQTT (1883) and API (8000) are unencrypted. Terminate TLS at a load balancer or ingress in production.
 - **Streaming bind mount**: `streaming` mounts `.:/app` in compose — dev only. Remove in production.
 - **Model volume**: `./models` is a bind mount in compose. Replace with a named shared volume in production so `api` and `airflow` can both access it.
