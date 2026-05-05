@@ -115,21 +115,6 @@ services:
     networks:
       - energy_network
 
-  redis:
-    image: redis:7
-    container_name: energy-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - energy_network
 
   flink-jobmanager:
     image: flink:1.17.1-scala_2.12-java11
@@ -263,8 +248,6 @@ services:
         condition: service_healthy
       influxdb:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -340,7 +323,6 @@ services:
 volumes:
   postgres_data:
   influxdb_data:
-  redis_data:
   zookeeper_data:
   zookeeper_logs:
   kafka_data:
