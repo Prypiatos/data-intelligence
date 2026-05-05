@@ -36,24 +36,31 @@ def _mock_conn(rows: list[dict]):
 # fetch_telemetry_batch
 # ---------------------------------------------------------------------------
 
+
 class TestFetchTelemetryBatch:
     def test_returns_list_of_dicts(self):
-        with patch("src.validation.postgres_batch_validator.get_postgres_connection",
-                   return_value=_mock_conn([VALID_RECORD])):
+        with patch(
+            "src.validation.postgres_batch_validator.get_postgres_connection",
+            return_value=_mock_conn([VALID_RECORD]),
+        ):
             result = fetch_telemetry_batch(START, END)
         assert isinstance(result, list)
         assert result[0]["node_id"] == "node_001"
 
     def test_returns_empty_list_when_no_rows(self):
-        with patch("src.validation.postgres_batch_validator.get_postgres_connection",
-                   return_value=_mock_conn([])):
+        with patch(
+            "src.validation.postgres_batch_validator.get_postgres_connection",
+            return_value=_mock_conn([]),
+        ):
             result = fetch_telemetry_batch(START, END)
         assert result == []
 
     def test_passes_time_params_to_query(self):
         conn = _mock_conn([])
-        with patch("src.validation.postgres_batch_validator.get_postgres_connection",
-                   return_value=conn):
+        with patch(
+            "src.validation.postgres_batch_validator.get_postgres_connection",
+            return_value=conn,
+        ):
             fetch_telemetry_batch(START, END)
         cur = conn.cursor.return_value
         call_args = cur.execute.call_args.args
@@ -65,10 +72,13 @@ class TestFetchTelemetryBatch:
 # validate_telemetry_batch — empty
 # ---------------------------------------------------------------------------
 
+
 class TestValidateTelemetryBatchEmpty:
     def test_empty_records_returns_zero_counts(self):
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[]):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[],
+        ):
             result = validate_telemetry_batch(START, END)
         assert result["checked"] == 0
         assert result["passed"] == 0
@@ -76,8 +86,10 @@ class TestValidateTelemetryBatchEmpty:
         assert result["failures"] == []
 
     def test_empty_result_has_time_fields(self):
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[]):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[],
+        ):
             result = validate_telemetry_batch(START, END)
         assert result["start_time"] == str(START)
         assert result["end_time"] == str(END)
@@ -87,15 +99,20 @@ class TestValidateTelemetryBatchEmpty:
 # validate_telemetry_batch — all pass
 # ---------------------------------------------------------------------------
 
+
 class TestValidateTelemetryBatchAllPass:
     def test_all_valid_records_pass(self):
         mock_result = MagicMock()
         mock_result.success = True
 
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[VALID_RECORD, VALID_RECORD]):
-            with patch("src.validation.postgres_batch_validator.validate_telemetry_dataframe",
-                       return_value=mock_result):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[VALID_RECORD, VALID_RECORD],
+        ):
+            with patch(
+                "src.validation.postgres_batch_validator.validate_telemetry_dataframe",
+                return_value=mock_result,
+            ):
                 result = validate_telemetry_batch(START, END)
 
         assert result["checked"] == 2
@@ -107,18 +124,30 @@ class TestValidateTelemetryBatchAllPass:
         mock_result = MagicMock()
         mock_result.success = True
 
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[VALID_RECORD]):
-            with patch("src.validation.postgres_batch_validator.validate_telemetry_dataframe",
-                       return_value=mock_result):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[VALID_RECORD],
+        ):
+            with patch(
+                "src.validation.postgres_batch_validator.validate_telemetry_dataframe",
+                return_value=mock_result,
+            ):
                 result = validate_telemetry_batch(START, END)
 
-        assert set(result.keys()) == {"start_time", "end_time", "checked", "passed", "failed", "failures"}
+        assert set(result.keys()) == {
+            "start_time",
+            "end_time",
+            "checked",
+            "passed",
+            "failed",
+            "failures",
+        }
 
 
 # ---------------------------------------------------------------------------
 # validate_telemetry_batch — some fail
 # ---------------------------------------------------------------------------
+
 
 class TestValidateTelemetryBatchSomeFail:
     def _make_failed_result(self, col: str, bad_indices: list[int]):
@@ -138,10 +167,14 @@ class TestValidateTelemetryBatchSomeFail:
 
     def test_failed_records_counted(self):
         bad_result = self._make_failed_result("voltage", [0])
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[VALID_RECORD, VALID_RECORD]):
-            with patch("src.validation.postgres_batch_validator.validate_telemetry_dataframe",
-                       return_value=bad_result):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[VALID_RECORD, VALID_RECORD],
+        ):
+            with patch(
+                "src.validation.postgres_batch_validator.validate_telemetry_dataframe",
+                return_value=bad_result,
+            ):
                 result = validate_telemetry_batch(START, END)
 
         assert result["failed"] == 1
@@ -150,10 +183,14 @@ class TestValidateTelemetryBatchSomeFail:
 
     def test_failure_contains_node_id_and_reason(self):
         bad_result = self._make_failed_result("voltage", [0])
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[VALID_RECORD]):
-            with patch("src.validation.postgres_batch_validator.validate_telemetry_dataframe",
-                       return_value=bad_result):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[VALID_RECORD],
+        ):
+            with patch(
+                "src.validation.postgres_batch_validator.validate_telemetry_dataframe",
+                return_value=bad_result,
+            ):
                 result = validate_telemetry_batch(START, END)
 
         failure = result["failures"][0]
@@ -172,10 +209,14 @@ class TestValidateTelemetryBatchSomeFail:
         mock_validation.success = False
         mock_validation.results = [row_result]
 
-        with patch("src.validation.postgres_batch_validator.fetch_telemetry_batch",
-                   return_value=[VALID_RECORD, VALID_RECORD]):
-            with patch("src.validation.postgres_batch_validator.validate_telemetry_dataframe",
-                       return_value=mock_validation):
+        with patch(
+            "src.validation.postgres_batch_validator.fetch_telemetry_batch",
+            return_value=[VALID_RECORD, VALID_RECORD],
+        ):
+            with patch(
+                "src.validation.postgres_batch_validator.validate_telemetry_dataframe",
+                return_value=mock_validation,
+            ):
                 result = validate_telemetry_batch(START, END)
 
         assert result["failed"] == 2

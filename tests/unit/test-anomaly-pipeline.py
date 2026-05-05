@@ -14,10 +14,10 @@ sys.modules["kafka"] = _kafka
 
 from src.models.anomaly.pipeline import _write_to_postgres, ANOMALY_TYPE  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # _write_to_postgres
 # ---------------------------------------------------------------------------
+
 
 def _make_conn():
     cur = MagicMock()
@@ -80,12 +80,16 @@ class TestWriteToPostgres:
 # run() — model not found path
 # ---------------------------------------------------------------------------
 
+
 class TestRunModelNotFound:
     def test_exits_when_model_missing(self):
         with patch("src.models.anomaly.pipeline.MODEL_PATH") as mock_path:
-            mock_path.__truediv__ = lambda s, o: MagicMock(**{"exists.return_value": False})
+            mock_path.__truediv__ = lambda s, o: MagicMock(
+                **{"exists.return_value": False}
+            )
             with pytest.raises(SystemExit):
                 from src.models.anomaly import pipeline
+
                 with patch.object(pipeline, "MODEL_PATH") as mp:
                     (mp / "detector.pkl").exists.return_value = False
                     with patch("sys.exit", side_effect=SystemExit):
@@ -96,10 +100,12 @@ class TestRunModelNotFound:
 # _build_consumer / _build_producer
 # ---------------------------------------------------------------------------
 
+
 class TestBuildConsumerProducer:
     def test_build_consumer_uses_correct_topic(self):
         with patch("src.models.anomaly.pipeline.KafkaConsumer") as mock:
             from src.models.anomaly.pipeline import _build_consumer, INPUT_TOPIC
+
             _build_consumer()
             mock.assert_called_once()
             assert mock.call_args.args[0] == INPUT_TOPIC
@@ -107,6 +113,7 @@ class TestBuildConsumerProducer:
     def test_build_producer_called_with_bootstrap_servers(self):
         with patch("src.models.anomaly.pipeline.KafkaProducer") as mock:
             from src.models.anomaly.pipeline import _build_producer
+
             _build_producer()
             mock.assert_called_once()
             assert "bootstrap_servers" in mock.call_args.kwargs

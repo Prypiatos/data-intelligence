@@ -230,7 +230,9 @@ def test_consume_stream_results_inserts_and_commits(mock_create, mock_insert):
 
 @patch("kafka_consumer.insert_stream_summary")
 @patch("kafka_consumer.create_results_consumer")
-def test_consume_stream_results_skips_commit_on_insert_failure(mock_create, mock_insert):
+def test_consume_stream_results_skips_commit_on_insert_failure(
+    mock_create, mock_insert
+):
     mock_insert.return_value = None
     mock_consumer = Mock()
     mock_consumer.__iter__ = Mock(return_value=iter([_make_message(_stream_summary())]))
@@ -244,7 +246,9 @@ def test_consume_stream_results_skips_commit_on_insert_failure(mock_create, mock
 
 @patch("kafka_consumer.insert_stream_summary")
 @patch("kafka_consumer.create_results_consumer")
-def test_consume_stream_results_handles_exception_without_crashing(mock_create, mock_insert):
+def test_consume_stream_results_handles_exception_without_crashing(
+    mock_create, mock_insert
+):
     mock_insert.side_effect = Exception("unexpected error")
     mock_consumer = Mock()
     mock_consumer.__iter__ = Mock(return_value=iter([_make_message(_stream_summary())]))
