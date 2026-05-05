@@ -162,7 +162,21 @@ Container-level Docker healthchecks are configured for:
 
 These services do **not** have container-level Docker healthchecks and should be monitored externally: `api`, `ingestion`, `storage`, `anomaly`, `streaming`, `mlflow`, `airflow`.
 
-The API does expose `GET /health` → `{"status": "healthy"}` which can be used as a load balancer health probe.
+The API exposes two monitoring endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness probe → `{"status": "healthy"}` — use as load balancer health probe |
+| `GET /metrics` | Prometheus metrics — point your Prometheus scraper here |
+
+Prometheus scrape config:
+```yaml
+scrape_configs:
+  - job_name: e2-api
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: /metrics
+```
 
 ---
 
