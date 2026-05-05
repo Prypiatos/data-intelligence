@@ -221,6 +221,13 @@ class TestForecastPredictBatch:
         )
         assert response.status_code == 400
 
+    def test_returns_400_for_wrong_sequence_length_in_batch(self, client_with_model):
+        response = client_with_model.post(
+            "/forecast/predict-batch",
+            json={"batch_readings": [[400] * 5]},
+        )
+        assert response.status_code == 400
+
 
 # ============================================================
 # GET /forecast/forecasts

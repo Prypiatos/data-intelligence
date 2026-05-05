@@ -120,6 +120,38 @@ def test_summarize_window_returns_window_bounds_and_record_count():
     }
 
 
+def test_validate_stream_maps_validate_message():
+    stream = Mock()
+    transforms.validate_stream(stream)
+    stream.map.assert_called_once_with(transforms.validate_message)
+
+
+def test_extract_valid_records_filters_invalid():
+    valid = json.dumps({"status": "valid", "data": valid_telemetry()})
+    invalid = json.dumps({"status": "invalid", "data": None, "reason": "bad"})
+
+    stream = Mock()
+    mapped1 = Mock()
+    mapped2 = Mock()
+    filtered = Mock()
+    stream.map.return_value = mapped1
+    mapped1.filter.return_value = mapped2
+    mapped2.map.return_value = filtered
+
+    result = transforms.extract_valid_records(stream)
+
+    assert result is filtered
+    filter_fn = mapped1.filter.call_args.args[0]
+    assert filter_fn(json.loads(valid)) is True
+    assert filter_fn(json.loads(invalid)) is False
+
+
+def test_assign_event_time_calls_assign_timestamps():
+    stream = Mock()
+    transforms.assign_event_time(stream)
+    stream.assign_timestamps_and_watermarks.assert_called_once()
+
+
 def test_window_records_uses_constant_key_and_two_second_tumbling_window():
     stream = Mock()
     keyed_stream = Mock()
