@@ -2,9 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
-import pytest
-
 from src.validation.postgres_batch_validator import (
     fetch_telemetry_batch,
     validate_telemetry_batch,
