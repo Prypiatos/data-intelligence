@@ -1,6 +1,18 @@
 FROM apache/airflow:2.6.2-python3.11
 
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PYTHONPATH=/opt/airflow
+
 COPY requirements.airflow.txt /requirements.airflow.txt
+COPY dags/ /opt/airflow/dags/
 COPY src/ /opt/airflow/src/
+
+USER airflow
 
 RUN pip install --no-cache-dir -r /requirements.airflow.txt
