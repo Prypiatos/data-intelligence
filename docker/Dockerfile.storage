@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src/ingestion
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -14,7 +14,6 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
-COPY models/ ./models/
+COPY src/ingestion /app/src/ingestion
 
-CMD ["python", "-m", "src.storage.kafka_storage_consumer"]
+CMD ["python", "src/ingestion/kafka_consumer.py"]

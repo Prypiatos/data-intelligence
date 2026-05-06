@@ -5,7 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'src/storage/**'
+      - 'src/ingestion/**'
+      - 'docker/Dockerfile.storage'
+      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
