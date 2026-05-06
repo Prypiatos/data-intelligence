@@ -1,11 +1,13 @@
-name: Anomaly CI/CD - Build and Push Docker Image
+name: Airflow CI/CD - Build and Push Docker Image
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'src/models/anomaly/**'
+      - 'dags/**'
+      - 'src/**'
+      - 'docker/Dockerfile.airflow'
   workflow_dispatch:
 
 jobs:
@@ -33,25 +35,25 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Docker image
-        # Build the anomaly detection image from its Dockerfile and tag it with both 'latest' and the commit SHA
+        # Build the Airflow image from its Dockerfile and tag it with both 'latest' and the commit SHA
         run: |
           docker build \
             --build-arg VERSION=${{ github.sha }} \
-            -t ${{ secrets.DOCKER_USERNAME }}/e2-anomaly:latest \
-            -t ${{ secrets.DOCKER_USERNAME }}/e2-anomaly:${{ github.sha }} \
-            -f docker/Dockerfile.anomaly \
+            -t ${{ secrets.DOCKER_USERNAME }}/e2-airflow:latest \
+            -t ${{ secrets.DOCKER_USERNAME }}/e2-airflow:${{ github.sha }} \
+            -f docker/Dockerfile.airflow \
             .
 
       - name: Push Docker image
         # Upload both tags to Docker Hub so the latest and the exact commit version are available
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/e2-anomaly:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/e2-anomaly:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/e2-airflow:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/e2-airflow:${{ github.sha }}
 
       - name: Update Kubernetes deployment
         # Update the container image reference in the k8s manifest with the new commit SHA
         run: |
-          sed -i "s|.*/e2-anomaly:.*|${{ secrets.DOCKER_USERNAME }}/e2-anomaly:${{ github.sha }}|g" platform-infra/k8s/data-intelligence/anomaly.yaml
+          sed -i "s|.*/e2-airflow:.*|${{ secrets.DOCKER_USERNAME }}/e2-airflow:${{ github.sha }}|g" platform-infra/k8s/data-intelligence/airflow.yaml
 
       - name: Commit and push k8s changes
         # Commit the updated k8s manifest and push it to the repository
@@ -59,6 +61,6 @@ jobs:
           cd platform-infra
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
-          git add k8s/data-intelligence/anomaly.yaml
-          git commit -m "Update Anomaly Detection container image to ${{ github.sha }}" || echo "No changes to commit"
+          git add k8s/data-intelligence/airflow.yaml
+          git commit -m "Update Airflow container image to ${{ github.sha }}" || echo "No changes to commit"
           git push
