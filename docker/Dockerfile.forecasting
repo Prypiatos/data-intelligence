@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install minimal system dependencies required for some Python packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       libpq-dev \
+       git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements_forecasting.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source
+COPY src/ ./src/
+
+# Defaults (can be overridden at runtime)
+ENV MODEL_PATH=models/lstm_model.pth
+ENV MLFLOW_TRACKING_URI=http://localhost:5000
+
+# By default run the batch forecasting pipeline
+CMD ["python", "-u", "src/models/forecasting/batch_pipeline.py"]
