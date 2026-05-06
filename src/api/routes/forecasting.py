@@ -16,10 +16,11 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from src.api.dependencies import get_db_engine
+from src.api.auth import get_current_user
 from src.models.forecasting.lstm_model import LSTMForecaster
 from sklearn.preprocessing import MinMaxScaler
 
-router = APIRouter(prefix="/forecast", tags=["forecasting"])
+router = APIRouter(prefix="/forecast", tags=["forecasting"], dependencies=[Depends(get_current_user)])
 
 # Global variables to hold the model and scaler (loaded once at startup)
 # Using global variables here is fine because the model doesn't change during runtime

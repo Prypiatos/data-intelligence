@@ -6,8 +6,9 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from src.api.dependencies import get_db_engine
+from src.api.auth import get_current_user
 
-router = APIRouter(prefix="/anomalies", tags=["anomalies"])
+router = APIRouter(prefix="/anomalies", tags=["anomalies"], dependencies=[Depends(get_current_user)])
 
 
 class AnomalyRecord(BaseModel):
