@@ -6,7 +6,6 @@ from src.streaming.kafka_source import build_kafka_source
 from src.streaming.kafka_results_sink import build_kafka_sink
 from src.streaming.telemetry_transforms import (
     SummarizeWindow,
-    assign_event_time,
     extract_valid_records,
     validate_stream,
     window_records,
@@ -20,17 +19,13 @@ def build_environment():
 
 
 def build_kafka_job():
-    """Build the Kafka Flink job."""
     env = build_environment()
     source = build_kafka_source()
     sink = build_kafka_sink()
-    # Kafka records are raw JSON strings here; event time is assigned after validation.
     stream = env.from_source(source, WatermarkStrategy.no_watermarks(), "kafka-source")
     validated = validate_stream(stream)
-    validated.print()
     valid_records = extract_valid_records(validated)
-    event_time_records = assign_event_time(valid_records)
-    windowed = window_records(event_time_records)
+    windowed = window_records(valid_records)
     summaries = windowed.process(SummarizeWindow(), output_type=Types.STRING())
     summaries.print()
     summaries.sink_to(sink)

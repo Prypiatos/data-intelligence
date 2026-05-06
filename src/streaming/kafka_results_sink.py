@@ -2,6 +2,7 @@ import os
 
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors.kafka import (
+    DeliveryGuarantee,
     KafkaRecordSerializationSchema,
     KafkaSink,
 )
@@ -20,5 +21,6 @@ def build_kafka_sink():
             .set_value_serialization_schema(SimpleStringSchema())
             .build()
         )
+        .set_delivery_guarantee(DeliveryGuarantee.NONE)
         .build()
     )

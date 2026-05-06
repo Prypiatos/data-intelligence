@@ -20,14 +20,13 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
       - energy_network
-
 
   mosquitto:
     image: eclipse-mosquitto:2
@@ -39,7 +38,7 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t 'healthcheck' -m 'ping' -q 0 || exit 1"]
+      test: [ "CMD-SHELL", "mosquitto_pub -h localhost -t 'healthcheck' -m 'ping' -q 0 || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,7 +57,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-energy_user}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-energy_user} -d ${POSTGRES_DB:-energy_db}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -76,14 +75,13 @@ services:
     ports:
       - "8086:8086"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8086/ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
       - energy_network
-
 
   streaming:
     build:
@@ -107,11 +105,7 @@ services:
     image: ghcr.io/mlflow/mlflow
     container_name: energy-mlflow
     command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri postgresql://${POSTGRES_USER:-energy_user}:${POSTGRES_PASSWORD:-energy_pass}@postgres:5432/${POSTGRES_DB:-energy_db}
-      --default-artifact-root /mlflow/artifacts
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-energy_user}:${POSTGRES_PASSWORD:-energy_pass}@postgres:5432/${POSTGRES_DB:-energy_db} --default-artifact-root /mlflow/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -146,15 +140,10 @@ services:
     ports:
       - "8081:8080"
     command: >
-      bash -c "
-      airflow db init &&
-      airflow users create --username admin --password ${AIRFLOW_ADMIN_PASSWORD:-changeme} --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
-      airflow webserver & airflow scheduler
-      "
+      bash -c " airflow db init && airflow users create --username admin --password ${AIRFLOW_ADMIN_PASSWORD:-changeme} --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver & airflow scheduler "
     restart: unless-stopped
     networks:
       - energy_network
-
 
   api:
     build:
@@ -172,6 +161,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     volumes:
       - ./data:/app/data
       - ./models:/app/models

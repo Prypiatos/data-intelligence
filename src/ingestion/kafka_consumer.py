@@ -69,11 +69,16 @@ def consume_stream_results():
 
     for message in consumer:
         try:
-            result = insert_stream_summary(message.value)
+            data = message.value
+            required = {"node_id", "window_start", "window_end", "avg_power", "max_power", "record_count"}
+            if not required.issubset(data.keys()):
+                consumer.commit()
+                continue
+            result = insert_stream_summary(data)
             if result is None:
                 print(
                     f"WARNING: stream summary insert failed for "
-                    f"{message.value.get('node_id')}; skipping commit"
+                    f"{data.get('node_id')}; skipping commit"
                 )
             else:
                 consumer.commit()
