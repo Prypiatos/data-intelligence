@@ -1,0 +1,40 @@
+name: Forecasting CI/CD - Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'src/models/forecasting/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        # Pull the repository contents onto the runner so we can build from it
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Install Buildx, the extended Docker build client that supports advanced features like caching
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        # Authenticate with Docker Hub using credentials stored in GitHub secrets
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        # Build the forecasting model image from its Dockerfile and tag it with both 'latest' and the commit SHA
+        run: |
+          docker build \
+            --build-arg VERSION=${{ github.sha }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/e2-forecasting:latest \
+            -t ${{ secrets.DOCKER_USERNAME }}/e2-forecasting:${{ github.sha }} \
+            -f docker/Dockerfile.forecasting \
+            .
+
+      - name: Push Docker image
+        # Upload both tags to Docker Hub so the latest and the exact commit version are available
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/e2-forecasting:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/e2-forecasting:${{ github.sha }}
