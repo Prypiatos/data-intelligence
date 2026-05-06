@@ -3,16 +3,18 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/src/ingestion
+ENV PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY src/ingestion/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY requirements.txt .
 
-COPY src/ingestion /app/src/ingestion
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "src/ingestion/kafka_consumer.py"]
+COPY src/ ./src/
+COPY models/ ./models/
+
+CMD ["python", "-m", "src.storage.kafka_storage_consumer"]

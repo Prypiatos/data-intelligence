@@ -3,17 +3,26 @@ name: Ingestion CI/CD - Build and Push Docker Image
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'src/ingestion/**'
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout data-intelligence code
         # Pull the repository contents onto the runner so we can build from it
         uses: actions/checkout@v4
+
+      - name: Checkout platform-infra code
+        # Checkout the platform-infra repo to update k8s files
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/platform-infra
+          path: platform-infra
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         # Install Buildx, the extended Docker build client that supports advanced features like caching
@@ -38,3 +47,18 @@ jobs:
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/e2-ingestion:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/e2-ingestion:${{ github.sha }}
+
+      - name: Update Kubernetes deployment
+        # Update the container image reference in the k8s manifest with the new commit SHA
+        run: |
+          sed -i "s|.*/e2-ingestion:.*|${{ secrets.DOCKER_USERNAME }}/e2-ingestion:${{ github.sha }}|g" platform-infra/k8s/data-intelligence/ingestion.yaml
+
+      - name: Commit and push k8s changes
+        # Commit the updated k8s manifest and push it to the repository
+        run: |
+          cd platform-infra
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add k8s/data-intelligence/ingestion.yaml
+          git commit -m "Update Ingestion container image to ${{ github.sha }}" || echo "No changes to commit"
+          git push
