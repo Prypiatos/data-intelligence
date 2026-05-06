@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS stream_summaries (
     window_end BIGINT NOT NULL,
     avg_power DOUBLE PRECISION NOT NULL,
     max_power DOUBLE PRECISION NOT NULL,
+    avg_voltage DOUBLE PRECISION,
+    avg_current DOUBLE PRECISION,
+    avg_energy_wh DOUBLE PRECISION,
     record_count INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (node_id, window_start)

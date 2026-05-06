@@ -16,6 +16,9 @@ class StreamSummary(BaseModel):
     window_end: int
     avg_power: float
     max_power: float
+    avg_voltage: Optional[float]
+    avg_current: Optional[float]
+    avg_energy_wh: Optional[float]
     record_count: int
 
 
@@ -26,7 +29,7 @@ def get_stream_summary(
     engine: Engine = Depends(get_db_engine),
 ):
     """Return per-node window summaries produced by the Flink streaming job."""
-    query = "SELECT node_id, window_start, window_end, avg_power, max_power, record_count FROM stream_summaries"
+    query = "SELECT node_id, window_start, window_end, avg_power, max_power, avg_voltage, avg_current, avg_energy_wh, record_count FROM stream_summaries"
     params: dict = {"limit": limit}
 
     if node_id:

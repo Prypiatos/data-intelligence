@@ -412,6 +412,9 @@ STREAM_ROWS = [
         "window_end": 1714800002000,
         "avg_power": 487.3,
         "max_power": 512.1,
+        "avg_voltage": 230.0,
+        "avg_current": 2.1,
+        "avg_energy_wh": 10.5,
         "record_count": 4,
     },
     {
@@ -420,6 +423,9 @@ STREAM_ROWS = [
         "window_end": 1714800002000,
         "avg_power": 310.0,
         "max_power": 340.0,
+        "avg_voltage": 228.0,
+        "avg_current": 1.4,
+        "avg_energy_wh": 8.2,
         "record_count": 2,
     },
 ]

@@ -139,6 +139,31 @@ def test_summarize_window_computes_avg_and_max_power():
     assert summary["max_power"] == 600.0
 
 
+def test_summarize_window_computes_avg_voltage_current_energy():
+    window = Mock()
+    window.start = 0
+    window.end = 2000
+
+    context = Mock()
+    context.window.return_value = window
+
+    r1 = valid_telemetry()
+    r1["voltage"] = 220.0
+    r1["current"] = 1.0
+    r1["energy_wh"] = 10.0
+    r2 = valid_telemetry()
+    r2["voltage"] = 240.0
+    r2["current"] = 3.0
+    r2["energy_wh"] = 20.0
+
+    result = transforms.SummarizeWindow().process("node_001", context, [r1, r2])
+    summary = json.loads(result[0])
+
+    assert summary["avg_voltage"] == 230.0
+    assert summary["avg_current"] == 2.0
+    assert summary["avg_energy_wh"] == 15.0
+
+
 def test_validate_stream_maps_validate_message():
     stream = Mock()
     transforms.validate_stream(stream)

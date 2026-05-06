@@ -23,8 +23,8 @@ def insert_stream_summary(data):
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO stream_summaries (node_id, window_start, window_end, avg_power, max_power, record_count)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO stream_summaries (node_id, window_start, window_end, avg_power, max_power, avg_voltage, avg_current, avg_energy_wh, record_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (node_id, window_start) DO NOTHING;
             """,
             (
@@ -33,6 +33,9 @@ def insert_stream_summary(data):
                 data["window_end"],
                 data["avg_power"],
                 data["max_power"],
+                data.get("avg_voltage"),
+                data.get("avg_current"),
+                data.get("avg_energy_wh"),
                 data["record_count"],
             ),
         )

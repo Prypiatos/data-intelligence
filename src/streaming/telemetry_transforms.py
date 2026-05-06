@@ -87,6 +87,9 @@ class SummarizeWindow(ProcessWindowFunction):
     def process(self, key, context, elements):
         records = list(elements)
         powers = [r["power"] for r in records]
+        voltages = [r["voltage"] for r in records]
+        currents = [r["current"] for r in records]
+        energies = [r["energy_wh"] for r in records]
         return [
             json.dumps(
                 {
@@ -95,6 +98,9 @@ class SummarizeWindow(ProcessWindowFunction):
                     "node_id": key,
                     "avg_power": sum(powers) / len(powers),
                     "max_power": max(powers),
+                    "avg_voltage": sum(voltages) / len(voltages),
+                    "avg_current": sum(currents) / len(currents),
+                    "avg_energy_wh": sum(energies) / len(energies),
                     "record_count": len(records),
                 }
             )
