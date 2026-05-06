@@ -3,7 +3,7 @@ name: Anomaly CI/CD - Build and Push Docker Image
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'src/models/anomaly/**'
 
