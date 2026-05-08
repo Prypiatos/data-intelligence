@@ -1,3 +1,8 @@
+[tool.pytest.ini_options]
+python_files = ["test_*.py", "test-*.py"]
+testpaths = ["tests"]
+pythonpath = ["."]
+
 [tool.mypy]
 
 [[tool.mypy.overrides]]

@@ -10,7 +10,11 @@ import pytest
 _kafka = types.ModuleType("kafka")
 _kafka.KafkaConsumer = MagicMock
 _kafka.KafkaProducer = MagicMock
+_kafka_errors = types.ModuleType("kafka.errors")
+_kafka_errors.KafkaError = Exception
+_kafka.errors = _kafka_errors
 sys.modules["kafka"] = _kafka
+sys.modules["kafka.errors"] = _kafka_errors
 
 from src.models.anomaly.pipeline import _write_to_postgres, ANOMALY_TYPE  # noqa: E402
 

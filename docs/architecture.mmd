@@ -1,0 +1,92 @@
+flowchart LR
+    SM[Smart Meters]
+
+    subgraph INGEST [Ingestion Service]
+        MQTT[Mosquitto]
+        MQTTC[MQTT Consumer]
+        VAL[Validator]
+        KPROD[Kafka Producer]
+    end
+
+    KAFKA[Apache Kafka]
+
+    subgraph RT [Real-Time Processing]
+        FLINK[Flink]
+        ANOMALY[Anomaly Detection]
+        KCONS[Storage Consumer]
+    end
+
+    subgraph STORE [Storage]
+        PG[(PostgreSQL)]
+        INFLUX[(InfluxDB)]
+    end
+
+    subgraph BATCH [Batch Layer]
+        DAGBATCH[Airflow DAG]
+        SPARK1[Spark Feature Engineering]
+        SPARK2[Spark Batch Analytics]
+    end
+
+    subgraph MLPLAT [ML Platform]
+        LSTM[LSTM Forecasting]
+        MLFLOW[MLflow]
+        RETRAIN[Retraining DAG]
+    end
+
+    subgraph SERVE [Serving Layer]
+        API[FastAPI]
+        WSOCK[WebSocket]
+        PROM[Prometheus]
+    end
+
+    subgraph DOWNSTREAM [Downstream Teams]
+        E3[E3]
+        E4[E4]
+    end
+
+    SM -->|MQTT| MQTT
+    MQTT --> MQTTC
+    MQTTC --> VAL
+    VAL --> KPROD
+    KPROD -->|energy.telemetry| KAFKA
+
+    KAFKA -->|energy.telemetry| FLINK
+    KAFKA -->|energy.telemetry| ANOMALY
+    KAFKA -->|energy.telemetry| KCONS
+    FLINK -->|energy.telemetry.results| KAFKA
+
+    KCONS -->|telemetry| PG
+    KCONS -->|telemetry| INFLUX
+    ANOMALY -->|anomaly records| PG
+
+    DAGBATCH --> SPARK1
+    DAGBATCH --> SPARK2
+    PG -->|telemetry readings| SPARK1
+    SPARK1 -->|energy features| PG
+    PG -->|energy features| SPARK2
+    SPARK2 -->|hourly / daily| PG
+
+    RETRAIN --> LSTM
+    RETRAIN --> ANOMALY
+    PG -->|energy features| LSTM
+    LSTM -->|forecasts| PG
+    LSTM -->|metrics| MLFLOW
+    ANOMALY -->|metrics| MLFLOW
+
+    PG -->|forecasts / anomalies| API
+    KAFKA -->|results stream| WSOCK
+    API -->|metrics| PROM
+    API -->|forecasts / anomalies / recommendations / stream history| E3
+    PROM -->|metrics| E4
+    WSOCK -->|live stream| E3
+
+    classDef broker fill:#ff9900,color:#000
+    classDef storage fill:#336791,color:#fff
+    classDef ml fill:#7b2d8b,color:#fff
+    classDef api fill:#009688,color:#fff
+    classDef batch fill:#e65100,color:#fff
+    class KAFKA,MQTT broker
+    class PG,INFLUX storage
+    class LSTM,ANOMALY,MLFLOW,RETRAIN ml
+    class API,WSOCK,PROM api
+    class SPARK1,SPARK2,DAGBATCH batch
