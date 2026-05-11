@@ -1,14 +1,12 @@
 """Unit tests for all FastAPI endpoints."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-import torch
 from fastapi.testclient import TestClient
 
 from src.api.dependencies import get_db_engine
 from src.api.main import app
-from src.api.routes import forecasting as forecasting_module
 
 # ============================================================
 # Helpers
@@ -56,32 +54,8 @@ def reset_dependency_overrides():
 
 @pytest.fixture()
 def client():
-    with patch.object(forecasting_module, "initialize_forecasting"):
-        with TestClient(app) as c:
-            yield c
-
-
-@pytest.fixture()
-def client_with_model(client):
-    """TestClient with a real (untrained) LSTM model wired up."""
-    device = torch.device("cpu")
-    from src.models.forecasting.lstm_model import LSTMForecaster
-    from sklearn.preprocessing import MinMaxScaler
-
-    model = LSTMForecaster().to(device)
-    model.eval()
-    scaler = MinMaxScaler()
-    scaler.fit([[0], [800]])
-
-    forecasting_module.model = model
-    forecasting_module.device = device
-    forecasting_module.scaler = scaler
-
-    yield client
-
-    forecasting_module.model = None
-    forecasting_module.device = None
-    forecasting_module.scaler = None
+    with TestClient(app) as c:
+        yield c
 
 
 # ============================================================
@@ -123,110 +97,6 @@ class TestHealth:
         assert "status" in data
         assert "version" in data
         assert "service" in data
-
-
-# ============================================================
-# POST /forecast/predict
-# ============================================================
-
-
-class TestForecastPredict:
-    def test_returns_503_when_model_not_loaded(self, client):
-        assert (
-            client.post(
-                "/forecast/predict", json={"power_readings": [400] * 10}
-            ).status_code
-            == 503
-        )
-
-    def test_returns_200_with_valid_input(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 10}
-        )
-        assert response.status_code == 200
-
-    def test_response_schema(self, client_with_model):
-        data = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 10}
-        ).json()
-        assert "forecast" in data
-        assert "hours_ahead" in data
-        assert "unit" in data
-        assert data["hours_ahead"] == 24
-        assert data["unit"] == "watts"
-
-    def test_forecast_has_24_values(self, client_with_model):
-        data = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 10}
-        ).json()
-        assert len(data["forecast"]) == 24
-
-    def test_forecast_values_are_non_negative(self, client_with_model):
-        data = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 10}
-        ).json()
-        assert all(v >= 0 for v in data["forecast"])
-
-    def test_returns_400_for_wrong_reading_count(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 5}
-        )
-        assert response.status_code == 400
-
-    def test_returns_400_for_too_many_readings(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict", json={"power_readings": [400] * 20}
-        )
-        assert response.status_code == 400
-
-
-# ============================================================
-# POST /forecast/predict-batch
-# ============================================================
-
-
-class TestForecastPredictBatch:
-    def test_returns_503_when_model_not_loaded(self, client):
-        response = client.post(
-            "/forecast/predict-batch",
-            json={"batch_readings": [[400] * 10]},
-        )
-        assert response.status_code == 503
-
-    def test_returns_200_with_valid_batch(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict-batch",
-            json={"batch_readings": [[400] * 10, [500] * 10]},
-        )
-        assert response.status_code == 200
-
-    def test_response_count_matches_input(self, client_with_model):
-        data = client_with_model.post(
-            "/forecast/predict-batch",
-            json={"batch_readings": [[400] * 10, [500] * 10, [300] * 10]},
-        ).json()
-        assert data["count"] == 3
-        assert len(data["forecasts"]) == 3
-
-    def test_each_forecast_has_24_values(self, client_with_model):
-        data = client_with_model.post(
-            "/forecast/predict-batch",
-            json={"batch_readings": [[400] * 10]},
-        ).json()
-        assert len(data["forecasts"][0]) == 24
-
-    def test_returns_400_for_empty_batch(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict-batch", json={"batch_readings": []}
-        )
-        assert response.status_code == 400
-
-    def test_returns_400_for_wrong_sequence_length_in_batch(self, client_with_model):
-        response = client_with_model.post(
-            "/forecast/predict-batch",
-            json={"batch_readings": [[400] * 5]},
-        )
-        assert response.status_code == 400
 
 
 # ============================================================

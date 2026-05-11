@@ -24,18 +24,7 @@ from src.api.routes import analytics, anomalies, forecasting, health, recommenda
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("\n" + "=" * 80)
-    print("Energy Management System API Startup")
-    print("=" * 80)
-
-    forecasting.initialize_forecasting()
-
-    print("\nAll systems initialized successfully!")
-    print("=" * 80 + "\n")
-
     yield
-
-    print("\nEnergy Management System API Shutting Down\n")
 
 
 # ============================================
@@ -101,8 +90,6 @@ def root():
         "endpoints": {
             "health": "/health (GET)",
             "forecasts": "/forecast/forecasts (GET)",
-            "forecast_predict": "/forecast/predict (POST)",
-            "forecast_batch": "/forecast/predict-batch (POST)",
             "anomalies": "/anomalies (GET)",
             "recommendations": "/recommendations (GET)",
             "telemetry_history": "/telemetry/history (GET)",

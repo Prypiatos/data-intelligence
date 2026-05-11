@@ -158,70 +158,6 @@ Returns an empty array `[]` if no forecasts have been generated yet. Forecasts a
 
 ---
 
-### POST /forecast/predict
-
-On demand 24 hour forecast given the last 10 hourly readings. Use this for interactive "what if" tools or when a node has no stored forecast.
-
-**Request body:**
-```json
-{
-  "power_readings": [400, 420, 450, 480, 500, 470, 420, 380, 350, 340]
-}
-```
-
-- `power_readings` - exactly **10** power values in watts, ordered oldest → newest
-
-**Response `200`:**
-```json
-{
-  "forecast": [412.3, 425.1, 438.7, 451.2, 462.0, 455.3, 441.8, 428.6, 415.2, 402.7, 398.1, 395.4, 401.2, 418.3, 435.6, 452.1, 461.8, 458.3, 443.2, 429.7, 416.1, 403.8, 397.2, 394.5],
-  "hours_ahead": 24,
-  "unit": "watts"
-}
-```
-
-- `forecast` - array of exactly 24 floats, one per hour starting from now
-- `hours_ahead` - always `24`
-- `unit` - always `"watts"`
-
-**Response `400`** (wrong input length):
-```json
-{ "detail": "Expected 10 power readings, got 5" }
-```
-
-> **Performance note:** This endpoint runs LSTM inference on every call (~80 ms, CPU bound). Use it on demand (user action), not for polling. For chart display, prefer `/forecast/forecasts` which returns pre computed results.
-
----
-
-### POST /forecast/predict-batch
-
-Forecast multiple nodes in one request. Use this when loading a dashboard with several nodes at once to avoid N sequential calls.
-
-**Request body:**
-```json
-{
-  "batch_readings": [
-    [400, 420, 450, 480, 500, 470, 420, 380, 350, 340],
-    [300, 310, 320, 315, 330, 325, 310, 305, 300, 295]
-  ]
-}
-```
-
-**Response `200`:**
-```json
-{
-  "forecasts": [
-    [412.3, 425.1, 438.7, "...24 values total"],
-    [308.2, 312.4, 316.8, "...24 values total"]
-  ],
-  "count": 2,
-  "hours_ahead": 24,
-  "unit": "watts"
-}
-```
-
----
-
 ### GET /telemetry/history
 
 Returns raw sensor readings from individual meters. Use this to display detailed historical charts or per-reading data for a specific node.
@@ -422,7 +358,6 @@ CORS is enabled. If you hit browser CORS errors, share your origin URL with E2 a
 | `/anomalies` | Poll every 30–60 s for live alert feeds |
 | `/recommendations` | Poll every 60 s maximum — generates live on each call |
 | `/forecast/forecasts` | Load once on page load, refresh every few minutes |
-| `/forecast/predict` | On user action only — not for polling |
 | `/telemetry/history` | Load on demand (user selects time range) — not for polling |
 | `/analytics/hourly` | Load on demand or once on page load for trend charts |
 | `/analytics/daily` | Load on demand or once on page load for daily summaries |
@@ -444,16 +379,6 @@ const anomalies = await fetch(`${BASE}/anomalies?node_id=node_001&severity=high`
 const recs = await fetch(`${BASE}/recommendations`)
   .then(r => r.json());
 // Returns: [{ node_id, type, severity, message, generated_at, metadata }, ...]
-
-// On-demand forecast
-const result = await fetch(`${BASE}/forecast/predict`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    power_readings: [400, 420, 450, 480, 500, 470, 420, 380, 350, 340]
-  })
-}).then(r => r.json());
-// result.forecast → array of 24 watts values
 
 // Convert timestamp to display time
 const displayTime = new Date(anomalies[0]?.timestamp).toLocaleString();
