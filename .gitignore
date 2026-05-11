@@ -26,7 +26,8 @@ spark-ivy/
 *.pkl
 *.pth
 !models/anomaly/detector.pkl
-!models/forecasting/lstm_model.pth
+!models/lstm_model.pth
+!models/lstm_scaler.pkl
 
 # IDEs
 .vscode/

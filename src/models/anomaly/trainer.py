@@ -1,12 +1,16 @@
 """
-Train the anomaly detection model against UCI household power consumption data.
+Train the anomaly detection model.
 
-Dataset: UCI Individual Household Electric Power Consumption
-Place the raw file at: data/uci-household-power.txt
+Supports two data sources (controlled by the DATA_SOURCE env var):
+  recon_sl  (default) — RECON-SL Sri Lankan smart meter dataset
+  uci                 — UCI Individual Household Electric Power Consumption
+
+UCI dataset: place the raw file at data/uci-household-power.txt
 Download: https://archive.ics.uci.edu/static/public/235/individual+household+electric+power+consumption.zip
 
 Usage:
     python -m src.models.anomaly.trainer
+    DATA_SOURCE=uci python -m src.models.anomaly.trainer
 
 MLflow UI:
     mlflow ui --backend-store-uri ./mlruns
@@ -25,8 +29,8 @@ from .model import AnomalyDetector
 EXPERIMENT_NAME = "anomaly-detection"
 MODEL_OUTPUT_DIR = Path("models/anomaly")
 UCI_DATA_PATH = Path("data/uci-household-power.txt")
+RECON_SL_MAX_ROWS = 500_000
 
-# Single household — treat as one node
 _NODE_ID = "uci-household-main"
 
 
@@ -85,24 +89,56 @@ def _compute_metrics(predictions: list[dict]) -> dict:
     }
 
 
+def _load_recon_sl_readings(max_rows: int = RECON_SL_MAX_ROWS) -> list[dict]:
+    """Load RECON-SL data and map columns to the telemetry reading schema."""
+    from src.models.recon_sl_loader import load_recon_sl
+
+    print("Loading RECON-SL dataset ...")
+    df = load_recon_sl()
+
+    if len(df) > max_rows:
+        df = df.sample(n=max_rows, random_state=42)
+
+    readings = [
+        {
+            "node_id": row.node_id,
+            "timestamp": int(row.timestamp_ms),
+            "voltage": float(row.voltage),
+            "current": float(row.current),
+            "power": float(row.power_w),
+            "energy_wh": float(row.energy_wh),
+        }
+        for row in df.itertuples(index=False)
+    ]
+    print(f"Prepared {len(readings):,} readings from RECON-SL")
+    return readings
+
+
 def train(
     contamination: float = 0.05,
     n_estimators: int = 100,
+    data_source: str | None = None,
     data_path: Path = UCI_DATA_PATH,
     output_dir: Path = MODEL_OUTPUT_DIR,
 ) -> AnomalyDetector:
-    if not data_path.exists():
-        raise FileNotFoundError(
-            f"UCI dataset not found at {data_path}. "
-            "Download from https://archive.ics.uci.edu/static/public/235/individual+household+electric+power+consumption.zip "
-            "and place the extracted .txt file at data/uci-household-power.txt"
-        )
+    if data_source is None:
+        data_source = os.getenv("DATA_SOURCE", "recon_sl")
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))  # type: ignore[attr-defined]
     mlflow.set_experiment(EXPERIMENT_NAME)  # type: ignore[attr-defined]
 
-    print(f"Loading UCI dataset from {data_path} ...")
-    readings = _load_uci_readings(data_path)
+    if data_source == "uci":
+        if not data_path.exists():
+            raise FileNotFoundError(
+                f"UCI dataset not found at {data_path}. "
+                "Download from https://archive.ics.uci.edu/static/public/235/individual+household+electric+power+consumption.zip "
+                "and place the extracted .txt file at data/uci-household-power.txt"
+            )
+        print(f"Loading UCI dataset from {data_path} ...")
+        readings = _load_uci_readings(data_path)
+    else:
+        readings = _load_recon_sl_readings()
+
     print(f"Loaded {len(readings):,} readings after dropping missing values")
 
     with mlflow.start_run():  # type: ignore[attr-defined]
@@ -111,7 +147,7 @@ def train(
         )
         detector.fit(readings)
 
-        mlflow.log_params({**detector.params, "n_readings": len(readings), "dataset": "uci-household-power"})  # type: ignore[attr-defined]
+        mlflow.log_params({**detector.params, "n_readings": len(readings), "dataset": data_source})  # type: ignore[attr-defined]
 
         print("Scoring readings ...")
         predictions = detector.predict(readings)

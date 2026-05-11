@@ -1,23 +1,24 @@
 import os
+import pickle
 import logging
-import torch
-import pandas as pd
-import numpy as np
 from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
 from sqlalchemy import create_engine
 import mlflow
 import mlflow.pytorch
 from dotenv import load_dotenv
 
-load_dotenv()  # Load environment variables from .env file
+load_dotenv()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
@@ -27,293 +28,156 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 MODEL_PATH = os.getenv("MODEL_PATH", "models/lstm_model.pth")
-FORECAST_HORIZON = 24  # 24-hour forecast
+SCALER_PATH = os.getenv("SCALER_PATH", "models/lstm_scaler.pkl")
+FORECAST_HORIZON = 24
+SEQ_LEN = 10
 
 
 class LSTMForecastingModel:
-    """LSTM model wrapper for forecasting"""
-
-    def __init__(self, model_path):
+    def __init__(self, model_path: str, scaler_path: str):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = torch.load(model_path, map_location=self.device)
+        self.model = torch.load(model_path, map_location=self.device, weights_only=False)
         self.model.eval()
-        logger.info(f"✅ Loaded model from {model_path}")
+        with open(scaler_path, "rb") as f:
+            self.scaler = pickle.load(f)
+        logger.info("Loaded model from %s", model_path)
 
-    def predict(self, features_sequence):
+    def predict(self, power_sequence: np.ndarray) -> np.ndarray:
         """
-        Generate forecast from features sequence
-
         Args:
-            features_sequence: numpy array of shape (1, seq_len, num_features)
-
+            power_sequence: 1-D array of SEQ_LEN hourly power readings in watts
         Returns:
-            predictions: numpy array of forecasted values
+            1-D array of FORECAST_HORIZON denormalized watt predictions
         """
+        normalized = self.scaler.transform(power_sequence.reshape(-1, 1))
+        X = torch.FloatTensor(normalized).unsqueeze(0).to(self.device)  # (1, seq_len, 1)
         with torch.no_grad():
-            X = torch.FloatTensor(features_sequence).to(self.device)
-            predictions = self.model(X)
-            return predictions.cpu().numpy()
+            output = self.model(X)
+        forecast = self.scaler.inverse_transform(
+            output.cpu().numpy()[0].reshape(-1, 1)
+        ).flatten()
+        return np.maximum(forecast, 0)
 
 
 def get_postgres_connection():
-    """Create PostgreSQL connection"""
-    connection_string = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-    engine = create_engine(connection_string)
-    logger.info("✅ Connected to PostgreSQL")
+    url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    engine = create_engine(url)
+    logger.info("Connected to PostgreSQL")
     return engine
 
 
-def fetch_latest_features(engine, lookback_hours=168):
-    """
-    Fetch latest energy features from PostgreSQL
-
-    Args:
-        engine: SQLAlchemy engine
-        lookback_hours: How many hours of history to fetch
-
-    Returns:
-        DataFrame with features grouped by node_id
-    """
+def fetch_latest_features(engine, seq_len: int = SEQ_LEN) -> pd.DataFrame:
+    """Fetch the last seq_len hours of avg_power per node from energy_features."""
+    lookback_ms = seq_len * 3600 * 1000 + 3600 * 1000  # extra hour buffer
     query = f"""
-    SELECT 
-        node_id,
-        timestamp,
-        avg_power,
-        avg_voltage,
-        avg_current,
-        min_power,
-        max_power,
-        std_power,
-        avg_energy_wh,
-        reading_count,
-        hour,
-        day_of_week,
-        day_of_month,
-        lag_1h,
-        lag_24h,
-        lag_168h,
-        rolling_avg_1d,
-        rolling_avg_7d,
-        rolling_avg_30d,
-        rolling_min_24h,
-        rolling_max_24h,
-        rolling_std_24h
-    FROM energy_features
-    WHERE timestamp >= (EXTRACT(EPOCH FROM NOW()) - {lookback_hours * 3600}) * 1000
-    ORDER BY node_id, timestamp DESC
+        SELECT node_id, timestamp, avg_power
+        FROM energy_features
+        WHERE timestamp >= EXTRACT(EPOCH FROM NOW()) * 1000 - {lookback_ms}
+        ORDER BY node_id, timestamp ASC
     """
-
     df = pd.read_sql(query, engine)
-    logger.info(
-        f"✅ Fetched {len(df)} feature rows from {df['node_id'].nunique()} nodes"
-    )
-
+    logger.info("Fetched %d rows for %d nodes", len(df), df["node_id"].nunique())
     return df
 
 
-def prepare_forecast_input(features_df, seq_len=24):
-    """
-    Prepare input sequences for LSTM prediction
-
-    Args:
-        features_df: DataFrame with features
-        seq_len: Sequence length for LSTM
-
-    Returns:
-        dict: {node_id: input_array}
-    """
+def prepare_forecast_input(features_df: pd.DataFrame, seq_len: int = SEQ_LEN) -> dict:
+    """Return {node_id: power_array} for nodes with enough history."""
     node_sequences = {}
-
-    for node_id in features_df["node_id"].unique():
-        node_data = features_df[features_df["node_id"] == node_id].sort_values(
-            "timestamp"
-        )
-
-        if len(node_data) < seq_len:
-            logger.warning(
-                f"⚠️  Node {node_id} has insufficient data ({len(node_data)} < {seq_len})"
-            )
+    for node_id, grp in features_df.groupby("node_id"):
+        grp = grp.sort_values("timestamp")
+        if len(grp) < seq_len:
+            logger.warning("Node %s has insufficient data (%d < %d)", node_id, len(grp), seq_len)
             continue
-
-        # Select feature columns (exclude timestamp and node_id)
-        feature_cols = [
-            "avg_power",
-            "avg_voltage",
-            "avg_current",
-            "min_power",
-            "max_power",
-            "std_power",
-            "avg_energy_wh",
-            "reading_count",
-            "hour",
-            "day_of_week",
-            "day_of_month",
-            "lag_1h",
-            "lag_24h",
-            "lag_168h",
-            "rolling_avg_1d",
-            "rolling_avg_7d",
-            "rolling_avg_30d",
-            "rolling_min_24h",
-            "rolling_max_24h",
-            "rolling_std_24h",
-        ]
-
-        # Get latest seq_len rows
-        sequence = node_data[feature_cols].tail(seq_len).values
-
-        # Normalize if needed (optional - depends on model training)
-        node_sequences[node_id] = np.expand_dims(
-            sequence, axis=0
-        )  # Add batch dimension
-
-    logger.info(f"✅ Prepared sequences for {len(node_sequences)} nodes")
+        node_sequences[node_id] = grp["avg_power"].tail(seq_len).values.astype(np.float32)
+    logger.info("Prepared sequences for %d nodes", len(node_sequences))
     return node_sequences
 
 
-def generate_forecasts(model, node_sequences):
-    """
-    Generate 24-hour forecasts for all nodes
-
-    Args:
-        model: LSTMForecastingModel instance
-        node_sequences: dict of {node_id: input_array}
-
-    Returns:
-        DataFrame with forecasts
-    """
+def generate_forecasts(model: LSTMForecastingModel, node_sequences: dict) -> pd.DataFrame:
     forecasts = []
-    current_timestamp = int(datetime.now().timestamp() * 1000)  # BIGINT milliseconds
+    current_timestamp = int(datetime.now().timestamp() * 1000)
 
     for node_id, sequence in node_sequences.items():
         try:
-            # Generate predictions
-            predictions = model.predict(sequence)
-
-            # Flatten predictions to 1D
-            predictions = predictions.flatten()[:FORECAST_HORIZON]
-
-            # Create forecast rows
-            for hour_offset in range(len(predictions)):
-                forecast_timestamp = current_timestamp + (hour_offset * 3600 * 1000)
-
-                forecasts.append(
-                    {
-                        "node_id": node_id,
-                        "timestamp": forecast_timestamp,
-                        "predicted_consumption": float(predictions[hour_offset]),
-                    }
-                )
-
+            predictions = model.predict(sequence)[:FORECAST_HORIZON]
+            for hour_offset, value in enumerate(predictions):
+                forecasts.append({
+                    "node_id": node_id,
+                    "timestamp": current_timestamp + hour_offset * 3600 * 1000,
+                    "predicted_consumption": float(value),
+                })
         except Exception as e:
-            logger.error(f"❌ Error generating forecast for {node_id}: {str(e)}")
-            continue
+            logger.error("Error generating forecast for %s: %s", node_id, e)
 
-    df_forecasts = pd.DataFrame(forecasts)
-    logger.info(f"✅ Generated {len(df_forecasts)} forecast rows")
-
-    return df_forecasts
+    df = pd.DataFrame(forecasts)
+    logger.info("Generated %d forecast rows", len(df))
+    return df
 
 
-def write_forecasts_to_db(engine, df_forecasts):
-    """
-    Write predictions to PostgreSQL forecasts table
-
-    Args:
-        engine: SQLAlchemy engine
-        df_forecasts: DataFrame with predictions
-    """
+def write_forecasts_to_db(engine, df_forecasts: pd.DataFrame) -> None:
     try:
         df_forecasts.to_sql("forecasts", engine, if_exists="append", index=False)
-        logger.info(f"✅ Written {len(df_forecasts)} forecast rows to PostgreSQL")
-
+        logger.info("Written %d forecast rows to PostgreSQL", len(df_forecasts))
     except Exception as e:
-        logger.error(f"❌ Error writing forecasts: {str(e)}")
+        logger.error("Error writing forecasts: %s", e)
         raise
 
 
-def log_to_mlflow(model_path, num_predictions, forecast_horizon):
-    """
-    Log batch pipeline run to MLflow
-
-    Args:
-        model_path: Path to trained model
-        num_predictions: Number of predictions generated
-        forecast_horizon: Forecast horizon (hours)
-    """
+def log_to_mlflow(model_path: str, num_predictions: int, forecast_horizon: int) -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment("batch-forecasting")
-
     with mlflow.start_run():
         mlflow.log_param("model_path", model_path)
         mlflow.log_param("forecast_horizon", forecast_horizon)
         mlflow.log_metric("num_predictions", num_predictions)
         mlflow.log_metric("timestamp", int(datetime.now().timestamp()))
+    logger.info("Logged batch pipeline run to MLflow")
 
-        logger.info("✅ Logged batch pipeline run to MLflow")
 
-
-def run_batch_pipeline():
-    """
-    Main batch forecasting pipeline
-    """
-    logger.info("=" * 80)
+def run_batch_pipeline() -> bool:
+    logger.info("=" * 60)
     logger.info("Starting Batch Forecasting Pipeline")
-    logger.info("=" * 80)
+    logger.info("=" * 60)
 
     try:
-        # 1. Load model
-        logger.info("Step 1: Loading trained LSTM model...")
-        model = LSTMForecastingModel(MODEL_PATH)
+        logger.info("Step 1: Loading trained LSTM model and scaler ...")
+        model = LSTMForecastingModel(MODEL_PATH, SCALER_PATH)
 
-        # 2. Connect to PostgreSQL
-        logger.info("Step 2: Connecting to PostgreSQL...")
+        logger.info("Step 2: Connecting to PostgreSQL ...")
         engine = get_postgres_connection()
 
-        # 3. Fetch latest features
-        logger.info("Step 3: Fetching latest energy features...")
-        df_features = fetch_latest_features(engine, lookback_hours=168)
-
+        logger.info("Step 3: Fetching latest energy features ...")
+        df_features = fetch_latest_features(engine)
         if df_features.empty:
-            logger.error("❌ No features found in database!")
+            logger.error("No features found in database")
             return False
 
-        # 4. Prepare input sequences
-        logger.info("Step 4: Preparing input sequences for LSTM...")
-        node_sequences = prepare_forecast_input(df_features, seq_len=24)
-
+        logger.info("Step 4: Preparing input sequences ...")
+        node_sequences = prepare_forecast_input(df_features)
         if not node_sequences:
-            logger.error("❌ No valid sequences prepared!")
+            logger.error("No valid sequences prepared")
             return False
 
-        # 5. Generate forecasts
-        logger.info("Step 5: Generating 24-hour forecasts...")
+        logger.info("Step 5: Generating 24-hour forecasts ...")
         df_forecasts = generate_forecasts(model, node_sequences)
-
         if df_forecasts.empty:
-            logger.error("❌ No forecasts generated!")
+            logger.error("No forecasts generated")
             return False
 
-        # 6. Write to database
-        logger.info("Step 6: Writing forecasts to PostgreSQL...")
+        logger.info("Step 6: Writing forecasts to PostgreSQL ...")
         write_forecasts_to_db(engine, df_forecasts)
 
-        # 7. Log to MLflow
-        logger.info("Step 7: Logging to MLflow...")
+        logger.info("Step 7: Logging to MLflow ...")
         log_to_mlflow(MODEL_PATH, len(df_forecasts), FORECAST_HORIZON)
 
-        logger.info("=" * 80)
-        logger.info("✅ Batch Forecasting Pipeline Completed Successfully!")
-        logger.info(
-            f"   Generated {len(df_forecasts)} forecasts across {len(node_sequences)} nodes"
-        )
-        logger.info("=" * 80)
-
+        logger.info("=" * 60)
+        logger.info("Batch Forecasting Pipeline completed — %d forecasts across %d nodes",
+                    len(df_forecasts), len(node_sequences))
+        logger.info("=" * 60)
         return True
 
     except Exception as e:
-        logger.error(f"❌ Pipeline failed: {str(e)}")
-        logger.error("=" * 80)
+        logger.error("Pipeline failed: %s", e)
         return False
 
 
