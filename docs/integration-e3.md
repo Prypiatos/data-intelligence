@@ -100,9 +100,9 @@ Returns energy optimization recommendations derived from anomaly data. Use this 
     "node_id": "node_001",
     "type": "high_anomaly",
     "severity": "high",
-    "message": "Node node_001 has 3 high-severity anomalies in the last 24h. Inspect meter and wiring.",
+    "message": "Node node_001 flagged with high-severity anomaly (score -0.180). Inspect for irregular consumption.",
     "generated_at": "2026-05-04T07:00:00+00:00",
-    "metadata": {}
+    "metadata": { "anomaly_score": -0.18 }
   }
 ]
 ```
@@ -301,11 +301,63 @@ Results are ordered newest first. Returns an empty array `[]` if the Spark pipel
 
 ---
 
+### WS /ws/live
+
+Live stream of Flink window summaries over WebSocket. Connect once and receive data as it arrives — no polling needed.
+
+**URL:** `ws://localhost:8000/ws/live` (local dev) / `ws://energy-api:8000/ws/live` (Docker)
+
+**Connection:** Open and keep alive. The server pushes a message every time a new 2-second window is computed by Flink.
+
+**Message format:**
+```json
+{
+  "node_id": "node_001",
+  "window_start": 1714800000000,
+  "window_end": 1714800002000,
+  "avg_power": 487.3,
+  "max_power": 512.1,
+  "avg_voltage": 230.0,
+  "avg_current": 2.1,
+  "avg_energy_wh": 10.5,
+  "record_count": 4
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `node_id` | string | Device/meter identifier |
+| `window_start` | integer | Unix epoch milliseconds — start of the 2-second window |
+| `window_end` | integer | Unix epoch milliseconds — end of the 2-second window |
+| `avg_power` | float | Average power in watts over the window |
+| `max_power` | float | Peak power in watts over the window |
+| `avg_voltage` | float | Average voltage over the window |
+| `avg_current` | float | Average current over the window |
+| `avg_energy_wh` | float | Average energy in watt-hours over the window |
+| `record_count` | integer | Number of readings that contributed to this window |
+
+**Keepalive:** If no data arrives within 30 seconds the server sends `{"type": "ping"}` — ignore this in your message handler.
+
+**Error message:** If Kafka is unreachable the server sends `{"error": "..."}` and the connection stays open.
+
+```js
+const ws = new WebSocket("ws://localhost:8000/ws/live");
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === "ping") return; // keepalive, ignore
+  if (data.error) { console.error("Stream error:", data.error); return; }
+  // handle live window summary
+};
+```
+
+---
+
 ## Errors
 
 | Status | Meaning | What to do |
 |---|---|---|
-| `400` | Bad request — invalid input | Fix the request (e.g. send exactly 10 readings) |
+| `400` | Bad request — invalid input | Fix the request parameters |
 | `503` | E2 database or model unavailable | Retry with exponential backoff — start at 2 s, cap at 30 s |
 
 Error body always:
