@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "energy_user")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "energy_pass")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "energy_db")
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")

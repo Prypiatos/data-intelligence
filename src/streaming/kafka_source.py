@@ -6,7 +6,7 @@ from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSo
 
 def build_kafka_source():
     """Build a kafka source for the telemetry stream."""
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 
     return (
         KafkaSource.builder()

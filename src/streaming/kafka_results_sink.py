@@ -10,7 +10,7 @@ from pyflink.datastream.connectors.kafka import (
 
 def build_kafka_sink():
     """Build the Kafka sink for processed telemetry summaries."""
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 
     return (
         KafkaSink.builder()

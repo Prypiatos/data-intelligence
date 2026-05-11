@@ -12,7 +12,7 @@ from .model import AnomalyDetector
 
 logger = logging.getLogger(__name__)
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 INPUT_TOPIC = "energy.telemetry"
 OUTPUT_TOPIC = "energy.anomalies"
 GROUP_ID = "anomaly-detection-group"

@@ -41,6 +41,7 @@ LOOKBACK_DAYS = 90
 TEST_SPLIT = 0.2
 SEQ_LEN = 10   # must match lstm_model.py SEQ_LEN
 PRED_LEN = 24
+STEP = 1       # stride=1 here (small 90-day window); standalone trainer uses 2 for large RECON-SL
 
 MODEL_PATH = "/opt/airflow/models/lstm_model.pth"
 SCALER_PATH = "/opt/airflow/models/lstm_scaler.pkl"
@@ -154,7 +155,7 @@ def retrain_lstm_model(**context):
             epoch_loss = 0.0
             n_batches = 0
             batch_X, batch_y = [], []
-            for i in range(len(train_data) - SEQ_LEN - PRED_LEN):
+            for i in range(0, len(train_data) - SEQ_LEN - PRED_LEN, STEP):
                 batch_X.append(train_data[i : i + SEQ_LEN])
                 batch_y.append(train_data[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN, 0])
                 if len(batch_X) == 32 or i == len(train_data) - SEQ_LEN - PRED_LEN - 1:

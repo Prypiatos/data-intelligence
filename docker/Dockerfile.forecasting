@@ -22,6 +22,7 @@ COPY src/ ./src/
 
 # Defaults (can be overridden at runtime)
 ENV MODEL_PATH=models/lstm_model.pth
+ENV SCALER_PATH=models/lstm_scaler.pkl
 ENV MLFLOW_TRACKING_URI=http://localhost:5000
 
 # By default run the batch forecasting pipeline
