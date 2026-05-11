@@ -39,7 +39,12 @@ MLFLOW_ANOMALY_EXPERIMENT = "anomaly-detection"
 
 LOOKBACK_DAYS = 90
 TEST_SPLIT = 0.2
-SEQ_LEN = 24  # LSTM input sequence length
+SEQ_LEN = 10   # must match lstm_model.py SEQ_LEN
+PRED_LEN = 24
+
+MODEL_PATH = "/opt/airflow/models/lstm_model.pth"
+SCALER_PATH = "/opt/airflow/models/lstm_scaler.pkl"
+ANOMALY_MODEL_PATH = "/opt/airflow/models/anomaly"
 
 
 def fetch_training_data(**context):
@@ -97,11 +102,13 @@ def retrain_lstm_model(**context):
     """Retrain LSTM forecasting model, log to MLflow, register if better."""
     logger.info("Task 2: Retraining LSTM Model")
 
+    import pickle
     import numpy as np
     import torch
     import mlflow
     import mlflow.pytorch
     import pandas as pd
+    from pathlib import Path
     from sklearn.preprocessing import MinMaxScaler
 
     from src.models.forecasting.lstm_model import LSTMForecaster
@@ -110,6 +117,8 @@ def retrain_lstm_model(**context):
     features_path = ti.xcom_pull(task_ids="fetch_training_data", key="features_path")
 
     df = pd.read_csv(features_path)
+    # Use per-node hourly power sequences ordered by node + timestamp
+    df = df.sort_values(["node_id", "timestamp"])
     data = df[["avg_power"]].values
 
     scaler = MinMaxScaler()
@@ -124,17 +133,16 @@ def retrain_lstm_model(**context):
 
     run_name = f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     with mlflow.start_run(run_name=run_name) as run:
-        mlflow.log_params(
-            {
-                "model_type": "LSTM",
-                "epochs": 50,
-                "batch_size": 32,
-                "learning_rate": 0.001,
-                "seq_len": SEQ_LEN,
-                "lookback_days": LOOKBACK_DAYS,
-                "training_samples": len(train_data),
-            }
-        )
+        mlflow.log_params({
+            "model_type": "LSTM",
+            "epochs": 50,
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "seq_len": SEQ_LEN,
+            "pred_len": PRED_LEN,
+            "lookback_days": LOOKBACK_DAYS,
+            "training_samples": len(train_data),
+        })
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = LSTMForecaster().to(device)
@@ -145,13 +153,11 @@ def retrain_lstm_model(**context):
             model.train()
             epoch_loss = 0.0
             n_batches = 0
-
-            # Build sliding-window batches: X=(batch, seq_len, 1), y=(batch, 24)
             batch_X, batch_y = [], []
-            for i in range(len(train_data) - SEQ_LEN - 24):
+            for i in range(len(train_data) - SEQ_LEN - PRED_LEN):
                 batch_X.append(train_data[i : i + SEQ_LEN])
-                batch_y.append(train_data[i + SEQ_LEN : i + SEQ_LEN + 24, 0])
-                if len(batch_X) == 32 or i == len(train_data) - SEQ_LEN - 25:
+                batch_y.append(train_data[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN, 0])
+                if len(batch_X) == 32 or i == len(train_data) - SEQ_LEN - PRED_LEN - 1:
                     X = torch.FloatTensor(np.array(batch_X)).to(device)
                     y = torch.FloatTensor(np.array(batch_y)).to(device)
                     pred = model(X)
@@ -165,21 +171,17 @@ def retrain_lstm_model(**context):
 
             avg_loss = epoch_loss / max(n_batches, 1)
             if (epoch + 1) % 10 == 0:
-                logger.info(f"Epoch {epoch+1}/50 - Loss: {avg_loss:.4f}")
+                logger.info(f"Epoch {epoch + 1}/50 - Loss: {avg_loss:.4f}")
                 mlflow.log_metric("train_loss", avg_loss, step=epoch)
 
-        # Evaluate on test set with sliding windows
+        # Evaluate on test set
         model.eval()
         test_preds, test_truths = [], []
         with torch.no_grad():
-            for i in range(len(test_data) - SEQ_LEN - 24):
-                X = (
-                    torch.FloatTensor(test_data[i : i + SEQ_LEN])
-                    .unsqueeze(0)
-                    .to(device)
-                )
+            for i in range(len(test_data) - SEQ_LEN - PRED_LEN):
+                X = torch.FloatTensor(test_data[i : i + SEQ_LEN]).unsqueeze(0).to(device)
                 pred = model(X).cpu().numpy().flatten()
-                truth = test_data[i + SEQ_LEN : i + SEQ_LEN + 24, 0]
+                truth = test_data[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN, 0]
                 test_preds.append(pred)
                 test_truths.append(truth)
 
@@ -190,8 +192,14 @@ def retrain_lstm_model(**context):
 
         mlflow.log_metrics({"test_rmse": rmse, "test_mape": mape})
         mlflow.pytorch.log_model(model, "lstm_model")
-
         logger.info(f"LSTM — RMSE: {rmse:.4f}, MAPE: {mape:.4f}")
+
+        # Save model and scaler to disk so batch_pipeline picks them up
+        Path(MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model, MODEL_PATH)
+        with open(SCALER_PATH, "wb") as f:
+            pickle.dump(scaler, f)
+        logger.info("Saved model → %s, scaler → %s", MODEL_PATH, SCALER_PATH)
 
         ti.xcom_push(key="lstm_metrics", value={"rmse": rmse, "mape": mape})
         ti.xcom_push(key="lstm_run_id", value=run.info.run_id)
@@ -236,9 +244,10 @@ def retrain_anomaly_model(**context):
         metrics = _compute_metrics(predictions)
         mlflow.log_metrics(metrics)
 
-        output_dir = "/opt/airflow/data/anomaly_model"
-        detector.save(output_dir)
-        mlflow.log_artifact(f"{output_dir}/detector.pkl", artifact_path="model")
+        # Save to the path the anomaly pipeline reads from
+        detector.save(ANOMALY_MODEL_PATH)
+        mlflow.log_artifact(f"{ANOMALY_MODEL_PATH}/detector.pkl", artifact_path="model")
+        logger.info("Saved anomaly model → %s", ANOMALY_MODEL_PATH)
 
         logger.info(
             f"Anomaly — anomaly_rate: {metrics['anomaly_rate']:.4f}, mean_score: {metrics['mean_score']:.4f}"
@@ -375,7 +384,7 @@ evaluate_task = PythonOperator(
 
 cleanup_task = BashOperator(
     task_id="cleanup",
-    bash_command="rm -f /opt/airflow/data/training_features.csv /opt/airflow/data/training_telemetry.csv /opt/airflow/data/anomaly_model/detector.pkl",
+    bash_command="rm -f /opt/airflow/data/training_features.csv /opt/airflow/data/training_telemetry.csv",
     dag=dag,
 )
 
