@@ -70,6 +70,8 @@ services:
     container_name: energy-influxdb
     env_file:
       - .env
+    environment:
+      DOCKER_INFLUXDB_INIT_RETENTION: 720h
     volumes:
       - influxdb_data:/var/lib/influxdb2
     ports:

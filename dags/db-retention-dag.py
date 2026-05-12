@@ -14,7 +14,6 @@ EPOCH_MS_TABLES = [
     "node_events",
     "node_health",
     "anomaly_records",
-    "stream_summaries",
     "forecasts",
 ]
 

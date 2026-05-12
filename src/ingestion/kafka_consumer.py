@@ -1,10 +1,9 @@
 import json
 import os
-import threading
 
 from kafka import KafkaConsumer
 
-from db_writer import insert_stream_summary, insert_telemetry
+from db_writer import insert_telemetry
 from influx_writer import write_telemetry
 from validator import validate_telemetry
 
@@ -18,17 +17,6 @@ def create_consumer():
         auto_offset_reset="earliest",
         enable_auto_commit=False,
         group_id="energy-storage-writer",
-        value_deserializer=lambda value: json.loads(value.decode("utf-8")),
-    )
-
-
-def create_results_consumer():
-    return KafkaConsumer(
-        "energy.telemetry.results",
-        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-        auto_offset_reset="earliest",
-        enable_auto_commit=False,
-        group_id="energy-stream-results-writer",
         value_deserializer=lambda value: json.loads(value.decode("utf-8")),
     )
 
@@ -63,33 +51,7 @@ def process_telemetry(data):
     return True
 
 
-def consume_stream_results():
-    consumer = create_results_consumer()
-    print("Kafka consumer started for topic: energy.telemetry.results")
-
-    for message in consumer:
-        try:
-            data = message.value
-            required = {"node_id", "window_start", "window_end", "avg_power", "max_power", "record_count"}
-            if not required.issubset(data.keys()):
-                consumer.commit()
-                continue
-            result = insert_stream_summary(data)
-            if result is None:
-                print(
-                    f"WARNING: stream summary insert failed for "
-                    f"{data.get('node_id')}; skipping commit"
-                )
-            else:
-                consumer.commit()
-        except Exception as error:
-            print("Error processing stream result:", error)
-
-
 def main():
-    results_thread = threading.Thread(target=consume_stream_results, daemon=True)
-    results_thread.start()
-
     consumer = create_consumer()
 
     print("Kafka consumer started for topic: energy.telemetry")
