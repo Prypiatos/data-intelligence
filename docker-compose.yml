@@ -35,6 +35,7 @@ services:
       - "1883:1883"
       - "9001:9001"
     volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
     healthcheck:
