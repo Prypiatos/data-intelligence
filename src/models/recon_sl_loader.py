@@ -7,7 +7,6 @@ Override with the RECON_SL_DIR environment variable.
 import os
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 _DEFAULT_DIR = (
