@@ -261,6 +261,8 @@ GET /telemetry/history?node_id=node_001&start=1714800000000&end=1714886400000
 Results are ordered newest first. Returns an empty array `[]` if no readings exist.
 
 > **Note:** Raw readings are high-frequency. Always provide `start`/`end` or a low `limit`. For charting over longer periods, prefer `/analytics/hourly` or `/analytics/daily`.
+>
+> **Data window:** InfluxDB retains 30 days of raw telemetry. Requests with `start` older than 30 days will return no data for that range.
 
 ---
 
