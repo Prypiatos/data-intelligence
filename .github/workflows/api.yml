@@ -51,7 +51,7 @@ jobs:
       - name: Update Kubernetes deployment
         # Update the container image reference in the k8s manifest with the new commit SHA
         run: |
-          sed -i "s|.*/e2-api:.*|${{ secrets.DOCKER_USERNAME }}/e2-api:${{ github.sha }}|g" platform-infra/k8s/data-intelligence/api.yaml
+          sed -i "s|image: .*/e2-api:.*|image: ${{ secrets.DOCKER_USERNAME }}/e2-api:${{ github.sha }}|g" platform-infra/k8s/data-intelligence/api.yaml
 
       - name: Commit and push k8s changes
         # Commit the updated k8s manifest and push it to the repository
