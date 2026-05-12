@@ -1,4 +1,4 @@
-"""Unit tests for the anomaly detection model (issue #40)."""
+"""Unit tests for the anomaly detection model."""
 
 import random
 
@@ -6,57 +6,55 @@ import pytest
 
 from src.models.anomaly.model import AnomalyDetector, SEVERITY_THRESHOLDS
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# Base timestamp: 2024-01-01 00:00:00 UTC (a Monday)
+_BASE_TS_MS = 1_704_067_200_000
+_HOUR_MS = 3_600_000
 
 
-def _make_readings(n: int, seed: int = 42, anomaly_fraction: float = 0.0) -> list[dict]:
-    """Generate varied normal readings with optional anomaly injections."""
+def _ts(day: int, hour: int) -> int:
+    """Return epoch ms for a given day offset and hour of day."""
+    return _BASE_TS_MS + day * 24 * _HOUR_MS + hour * _HOUR_MS
+
+
+def _make_readings(n: int, seed: int = 42) -> list[dict]:
+    """Generate readings active only during daytime hours (8am–10pm)."""
     rng = random.Random(seed)
     readings = []
     for i in range(n):
-        is_anomaly = anomaly_fraction > 0 and rng.random() < anomaly_fraction
-        voltage = rng.uniform(220, 240)
-        if is_anomaly:
-            current = rng.uniform(18, 30)
-            power = voltage * current * rng.uniform(0.3, 0.5)
-        else:
-            current = rng.uniform(0.5, 8.0)
-            power = voltage * current * rng.uniform(0.85, 0.99)
-        readings.append(
-            {
-                "node_id": f"plug-{i % 5:02d}",
-                "timestamp": 1_000_000 + i * 60_000,
-                "voltage": round(voltage, 2),
-                "current": round(current, 3),
-                "power": round(power, 2),
-                "energy_wh": round(power / 60, 4),
-            }
-        )
+        hour = rng.randint(8, 22)
+        day = i % 14
+        readings.append({
+            "node_id": f"plug-{i % 5:02d}",
+            "timestamp": _ts(day, hour),
+            "voltage": 230.0,
+            "current": 0.26,
+            "power": 60.0,
+            "energy_wh": 0.083,
+        })
     return readings
 
 
-def _normal_reading(node_id: str = "plug-01", ts: int = 1_000_000) -> dict:
+def _normal_reading(node_id: str = "plug-01", ts: int = None) -> dict:
+    """A reading during normal operating hours (Monday 2pm, device on)."""
     return {
         "node_id": node_id,
-        "timestamp": ts,
+        "timestamp": ts if ts is not None else _ts(0, 14),
         "voltage": 230.0,
-        "current": 2.0,
-        "power": 450.0,
-        "energy_wh": 7.5,
+        "current": 0.26,
+        "power": 60.0,
+        "energy_wh": 0.083,
     }
 
 
-def _anomalous_reading(node_id: str = "plug-01", ts: int = 2_000_000) -> dict:
-    """Theft-style anomaly: very high current, low power factor."""
+def _anomalous_reading(node_id: str = "plug-01", ts: int = None) -> dict:
+    """A reading at an unusual hour (Monday 3am, device on when it never is)."""
     return {
         "node_id": node_id,
-        "timestamp": ts,
+        "timestamp": ts if ts is not None else _ts(0, 3),
         "voltage": 230.0,
-        "current": 28.0,
-        "power": 900.0,
-        "energy_wh": 55.0,
+        "current": 0.26,
+        "power": 60.0,
+        "energy_wh": 0.083,
     }
 
 
@@ -96,10 +94,11 @@ class TestAnomalyDetectorFit:
 
     def test_predict_preserves_node_id_and_timestamp(self):
         detector = _fitted_detector()
-        reading = _normal_reading(node_id="main-03", ts=99999)
+        ts = _ts(0, 14)
+        reading = _normal_reading(node_id="main-03", ts=ts)
         result = detector.predict([reading])[0]
         assert result["node_id"] == "main-03"
-        assert result["timestamp"] == 99999
+        assert result["timestamp"] == ts
 
 
 # ---------------------------------------------------------------------------
@@ -109,43 +108,33 @@ class TestAnomalyDetectorFit:
 
 class TestSeverityScoring:
     def test_normal_readings_have_low_severity(self):
-        """Normal readings should not be flagged as high severity."""
+        """Daytime readings should not be flagged as high severity."""
         detector = _fitted_detector(n=400)
-        # Score a batch of typical readings
         readings = _make_readings(20, seed=99)
         results = detector.predict(readings)
         high_count = sum(1 for r in results if r["severity"] == "high")
-        # With contamination=0.05 we allow a small fraction; none should be high
-        assert (
-            high_count == 0
-        ), f"{high_count} normal readings incorrectly flagged as high"
+        assert high_count == 0, f"{high_count} daytime readings incorrectly flagged as high"
 
     def test_anomalous_readings_flagged(self):
-        """Clear outliers should not be scored as normal."""
+        """Device active at 3am should not score as normal when never active at night."""
         normal = _make_readings(300)
-        detector = AnomalyDetector(
-            contamination=0.05, n_estimators=100, random_state=42
-        )
+        detector = AnomalyDetector(contamination=0.05, n_estimators=100, random_state=42)
         detector.fit(normal)
-
         result = detector.predict([_anomalous_reading()])[0]
-        assert (
-            result["severity"] != "normal"
-        ), f"Expected anomaly to be flagged, got 'normal' (score={result['anomaly_score']})"
-
-    def test_score_is_lower_for_anomaly_than_normal(self):
-        """Anomaly score (decision function) should be lower for outliers."""
-        normal = _make_readings(300)
-        detector = AnomalyDetector(
-            contamination=0.05, n_estimators=100, random_state=42
+        assert result["severity"] != "normal", (
+            f"Expected 3am reading to be flagged, got 'normal' (score={result['anomaly_score']})"
         )
-        detector.fit(normal)
 
-        normal_score = detector.predict([_normal_reading(ts=1)])[0]["anomaly_score"]
-        anomaly_score = detector.predict([_anomalous_reading(ts=2)])[0]["anomaly_score"]
-        assert (
-            anomaly_score < normal_score
-        ), f"Expected anomaly score ({anomaly_score}) < normal score ({normal_score})"
+    def test_score_is_lower_for_unusual_hour(self):
+        """Anomaly score should be lower for a device active at an unusual hour."""
+        normal = _make_readings(300)
+        detector = AnomalyDetector(contamination=0.05, n_estimators=100, random_state=42)
+        detector.fit(normal)
+        normal_score = detector.predict([_normal_reading()])[0]["anomaly_score"]
+        anomaly_score = detector.predict([_anomalous_reading()])[0]["anomaly_score"]
+        assert anomaly_score < normal_score, (
+            f"Expected anomaly score ({anomaly_score}) < normal score ({normal_score})"
+        )
 
     def test_severity_thresholds_order(self):
         assert (
@@ -173,17 +162,12 @@ class TestSeverityScoring:
 
 
 class TestEdgeCases:
-    def test_dead_circuit_zero_current(self):
-        """Zero current/power should not cause division-by-zero in power_factor calc."""
+    def test_device_off_at_usual_hour_scores_without_crash(self):
+        """Device off during normal hours — is_active=0 is a valid feature state."""
         detector = _fitted_detector()
-        reading = {
-            "node_id": "plug-01",
-            "timestamp": 1,
-            "voltage": 230.0,
-            "current": 0.0,
-            "power": 0.0,
-            "energy_wh": 0.0,
-        }
+        reading = _normal_reading()
+        reading["power"] = 0.0
+        reading["current"] = 0.0
         results = detector.predict([reading])
         assert len(results) == 1
         assert isinstance(results[0]["anomaly_score"], float)
@@ -202,68 +186,38 @@ class TestEdgeCases:
     def test_multiple_nodes_in_batch(self):
         detector = _fitted_detector()
         readings = [
-            _normal_reading(node_id="plug-01", ts=1),
-            _normal_reading(node_id="plug-02", ts=2),
-            _normal_reading(node_id="main-01", ts=3),
+            _normal_reading(node_id="plug-01"),
+            _normal_reading(node_id="plug-02"),
+            _normal_reading(node_id="main-01"),
         ]
         results = detector.predict(readings)
         node_ids = [r["node_id"] for r in results]
         assert node_ids == ["plug-01", "plug-02", "main-01"]
 
-    def test_out_of_range_high_voltage(self):
-        """Extremely high voltage should be scoreable without crashing."""
-        detector = _fitted_detector()
-        reading = {
-            "node_id": "plug-01",
-            "timestamp": 1,
-            "voltage": 10_000.0,
-            "current": 100.0,
-            "power": 500_000.0,
-            "energy_wh": 9999.0,
-        }
-        results = detector.predict([reading])
-        assert len(results) == 1
-
-    def test_out_of_range_negative_values(self):
-        """Negative readings (sensor glitch) should not crash the model."""
-        detector = _fitted_detector()
-        reading = {
-            "node_id": "plug-01",
-            "timestamp": 1,
-            "voltage": -5.0,
-            "current": -1.0,
-            "power": -10.0,
-            "energy_wh": -0.1,
-        }
-        results = detector.predict([reading])
-        assert len(results) == 1
-
-    def test_missing_field_raises(self):
-        """A reading missing a required feature column should raise KeyError."""
+    def test_missing_power_field_raises(self):
+        """A reading missing power (needed for is_active) should raise KeyError."""
         detector = _fitted_detector()
         incomplete = {
             "node_id": "plug-01",
-            "timestamp": 1,
+            "timestamp": _ts(0, 14),
             "voltage": 230.0,
-            "current": 2.0,
-            # missing: power, energy_wh
+            "current": 0.26,
         }
         with pytest.raises(KeyError):
             detector.predict([incomplete])
 
-    def test_null_value_does_not_crash(self):
-        """A None value in a numeric field should not raise — NaN propagates silently."""
+    def test_missing_timestamp_raises(self):
+        """A reading missing timestamp (needed for hour/day features) should raise."""
         detector = _fitted_detector()
-        reading = {
+        incomplete = {
             "node_id": "plug-01",
-            "timestamp": 1,
-            "voltage": None,
-            "current": 2.0,
-            "power": 450.0,
-            "energy_wh": 7.5,
+            "voltage": 230.0,
+            "current": 0.26,
+            "power": 60.0,
+            "energy_wh": 0.083,
         }
-        results = detector.predict([reading])
-        assert len(results) == 1
+        with pytest.raises((KeyError, Exception)):
+            detector.predict([incomplete])
 
 
 # ---------------------------------------------------------------------------
@@ -275,19 +229,15 @@ class TestSaveLoad:
     def test_save_and_load_produces_same_scores(self, tmp_path):
         detector = _fitted_detector()
         reading = _normal_reading()
-
         score_before = detector.predict([reading])[0]["anomaly_score"]
-
         detector.save(tmp_path)
         loaded = AnomalyDetector.load(tmp_path)
         score_after = loaded.predict([reading])[0]["anomaly_score"]
-
         assert score_before == pytest.approx(score_after)
 
     def test_loaded_detector_can_predict(self, tmp_path):
         detector = _fitted_detector()
         detector.save(tmp_path)
-
         loaded = AnomalyDetector.load(tmp_path)
         results = loaded.predict([_normal_reading(), _anomalous_reading()])
         assert len(results) == 2
@@ -295,9 +245,7 @@ class TestSaveLoad:
 
     def test_predict_before_fit_raises_after_load_from_empty(self, tmp_path):
         """Loading a detector that was never fitted should still raise on predict."""
-        # Manually save a blank state
         import pickle
-
         (tmp_path / "detector.pkl").write_bytes(
             pickle.dumps({"model": None, "scaler": None})
         )

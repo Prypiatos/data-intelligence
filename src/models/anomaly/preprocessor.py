@@ -3,24 +3,19 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 FEATURE_COLUMNS = [
-    "voltage",
-    "current",
-    "power",
-    "energy_wh",
-    "power_factor",
-    "apparent_power",
+    "hour_of_day",
+    "day_of_week",
+    "is_active",
 ]
 
 
 def extract_features(readings: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(readings)
-    df["apparent_power"] = df["voltage"] * df["current"]
-    # Avoid division by zero for dead circuits
-    df["power_factor"] = np.where(
-        df["apparent_power"] > 0,
-        df["power"] / df["apparent_power"],
-        0.0,
-    )
+    # timestamp is epoch milliseconds
+    dt = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+    df["hour_of_day"] = dt.dt.hour
+    df["day_of_week"] = dt.dt.dayofweek
+    df["is_active"] = (df["power"] > 0).astype(int)
     return df[FEATURE_COLUMNS]
 
 
