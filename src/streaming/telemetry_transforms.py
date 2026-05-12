@@ -11,18 +11,22 @@ WINDOW_SIZE_MS = 2000
 
 def validate_message(value):
     if not value or value.strip() == "":
-        return json.dumps({"status": "invalid", "reason": "Empty message", "data": None})
+        return json.dumps(
+            {"status": "invalid", "reason": "Empty message", "data": None}
+        )
     try:
         payload = json.loads(value)
     except json.JSONDecodeError:
         return json.dumps({"status": "invalid", "reason": "Invalid JSON", "data": None})
 
     is_valid, message = validate_telemetry(payload)
-    return json.dumps({
-        "status": "valid" if is_valid else "invalid",
-        "reason": message,
-        "data": payload,
-    })
+    return json.dumps(
+        {
+            "status": "valid" if is_valid else "invalid",
+            "reason": message,
+            "data": payload,
+        }
+    )
 
 
 def validate_stream(stream):
@@ -55,15 +59,17 @@ class SummarizeWindow(ProcessWindowFunction):
         currents = [r["current"] for r in records]
         energies = [r["energy_wh"] for r in records]
         return [
-            json.dumps({
-                "window_start": context.window().start,
-                "window_end": context.window().end,
-                "node_id": key,
-                "avg_power": sum(powers) / len(powers),
-                "max_power": max(powers),
-                "avg_voltage": sum(voltages) / len(voltages),
-                "avg_current": sum(currents) / len(currents),
-                "avg_energy_wh": sum(energies) / len(energies),
-                "record_count": len(records),
-            })
+            json.dumps(
+                {
+                    "window_start": context.window().start,
+                    "window_end": context.window().end,
+                    "node_id": key,
+                    "avg_power": sum(powers) / len(powers),
+                    "max_power": max(powers),
+                    "avg_voltage": sum(voltages) / len(voltages),
+                    "avg_current": sum(currents) / len(currents),
+                    "avg_energy_wh": sum(energies) / len(energies),
+                    "record_count": len(records),
+                }
+            )
         ]

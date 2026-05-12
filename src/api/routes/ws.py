@@ -13,7 +13,9 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 RESULTS_TOPIC = "energy.telemetry.results"
 
 
-def _kafka_to_queue(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop, stop: threading.Event):
+def _kafka_to_queue(
+    queue: asyncio.Queue, loop: asyncio.AbstractEventLoop, stop: threading.Event
+):
     try:
         consumer = KafkaConsumer(
             RESULTS_TOPIC,
@@ -29,7 +31,14 @@ def _kafka_to_queue(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop, stop:
                 if stop.is_set():
                     break
                 data = message.value
-                required = {"node_id", "window_start", "window_end", "avg_power", "max_power", "record_count"}
+                required = {
+                    "node_id",
+                    "window_start",
+                    "window_end",
+                    "avg_power",
+                    "max_power",
+                    "record_count",
+                }
                 if not required.issubset(data.keys()):
                     continue
                 asyncio.run_coroutine_threadsafe(queue.put(data), loop)
@@ -45,7 +54,9 @@ async def live_stream(websocket: WebSocket):
     queue: asyncio.Queue = asyncio.Queue()
     stop = threading.Event()
 
-    thread = threading.Thread(target=_kafka_to_queue, args=(queue, loop, stop), daemon=True)
+    thread = threading.Thread(
+        target=_kafka_to_queue, args=(queue, loop, stop), daemon=True
+    )
     thread.start()
 
     try:

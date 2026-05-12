@@ -39,9 +39,9 @@ MLFLOW_ANOMALY_EXPERIMENT = "anomaly-detection"
 
 LOOKBACK_DAYS = 30
 TEST_SPLIT = 0.2
-SEQ_LEN = 10   # must match lstm_model.py SEQ_LEN
+SEQ_LEN = 10  # must match lstm_model.py SEQ_LEN
 PRED_LEN = 24
-STEP = 1       # stride=1 here (small 90-day window); standalone trainer uses 2 for large RECON-SL
+STEP = 1  # stride=1 here (small 90-day window); standalone trainer uses 2 for large RECON-SL
 
 MODEL_PATH = "/opt/airflow/models/lstm_model.pth"
 SCALER_PATH = "/opt/airflow/models/lstm_scaler.pkl"
@@ -133,14 +133,16 @@ def retrain_lstm_model(**context):
 
     run_name = f"lstm_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     with mlflow.start_run(run_name=run_name) as run:
-        mlflow.log_params({
-            "model_type": "LSTM",
-            "epochs": 50,
-            "seq_len": SEQ_LEN,
-            "pred_len": PRED_LEN,
-            "lookback_days": LOOKBACK_DAYS,
-            "training_rows": len(df_train),
-        })
+        mlflow.log_params(
+            {
+                "model_type": "LSTM",
+                "epochs": 50,
+                "seq_len": SEQ_LEN,
+                "pred_len": PRED_LEN,
+                "lookback_days": LOOKBACK_DAYS,
+                "training_rows": len(df_train),
+            }
+        )
 
         model, scaler = train_from_df(df_train, epochs=50)
 
@@ -153,8 +155,12 @@ def retrain_lstm_model(**context):
             if len(vals) < SEQ_LEN + PRED_LEN:
                 continue
             for i in range(0, len(vals) - SEQ_LEN - PRED_LEN + 1, STEP):
-                x_norm = scaler.transform(vals[i : i + SEQ_LEN].reshape(-1, 1)).flatten()
-                y_norm = scaler.transform(vals[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN].reshape(-1, 1)).flatten()
+                x_norm = scaler.transform(
+                    vals[i : i + SEQ_LEN].reshape(-1, 1)
+                ).flatten()
+                y_norm = scaler.transform(
+                    vals[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN].reshape(-1, 1)
+                ).flatten()
                 X = torch.FloatTensor(x_norm).unsqueeze(0).unsqueeze(-1).to(device)
                 with torch.no_grad():
                     pred = model(X).cpu().numpy().flatten()

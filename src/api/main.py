@@ -19,7 +19,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import route modules from other teams
-from src.api.routes import analytics, anomalies, forecasting, health, nodes, recommendations, telemetry, ws
+from src.api.routes import (
+    analytics,
+    anomalies,
+    forecasting,
+    health,
+    nodes,
+    recommendations,
+    telemetry,
+    ws,
+)
 
 
 @asynccontextmanager

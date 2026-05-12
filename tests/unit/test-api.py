@@ -296,8 +296,14 @@ _now_ms = int(time.time() * 1000)
 _day_ms = 24 * 3600 * 1000
 
 NODE_ROWS = [
-    {"node_id": "node_001", "first_seen_ms": _now_ms - 2 * _day_ms},   # 2 days old — learning
-    {"node_id": "node_002", "first_seen_ms": _now_ms - 35 * _day_ms},  # 35 days old — active
+    {
+        "node_id": "node_001",
+        "first_seen_ms": _now_ms - 2 * _day_ms,
+    },  # 2 days old — learning
+    {
+        "node_id": "node_002",
+        "first_seen_ms": _now_ms - 35 * _day_ms,
+    },  # 35 days old — active
 ]
 
 

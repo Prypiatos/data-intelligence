@@ -35,7 +35,9 @@ class DailyAnalytics(BaseModel):
 def get_hourly_analytics(
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
     division: Optional[str] = Query(None, description="Filter by division"),
-    start: Optional[int] = Query(None, description="Start time (Unix epoch ms, inclusive)"),
+    start: Optional[int] = Query(
+        None, description="Start time (Unix epoch ms, inclusive)"
+    ),
     end: Optional[int] = Query(None, description="End time (Unix epoch ms, inclusive)"),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     engine: Engine = Depends(get_db_engine),
@@ -78,7 +80,9 @@ def get_hourly_analytics(
 def get_daily_analytics(
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
     division: Optional[str] = Query(None, description="Filter by division"),
-    start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD, inclusive)"),
+    start: Optional[str] = Query(
+        None, description="Start date (YYYY-MM-DD, inclusive)"
+    ),
     end: Optional[str] = Query(None, description="End date (YYYY-MM-DD, inclusive)"),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     engine: Engine = Depends(get_db_engine),

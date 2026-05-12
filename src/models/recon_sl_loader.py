@@ -50,13 +50,15 @@ def load_recon_sl(
     df = pd.concat(chunks, ignore_index=True)
     print(f"  Loaded {len(df):,} rows, {df['household_ID'].nunique():,} households")
 
-    df = df.rename(columns={
-        "household_ID": "node_id",
-        "avgimportkw(kw)": "avg_import_kw",
-        "phaseainstvoltage(v)": "voltage",
-        "phaseainstcurrent(a)": "current",
-        "powerfactor": "power_factor",
-    })
+    df = df.rename(
+        columns={
+            "household_ID": "node_id",
+            "avgimportkw(kw)": "avg_import_kw",
+            "phaseainstvoltage(v)": "voltage",
+            "phaseainstcurrent(a)": "current",
+            "powerfactor": "power_factor",
+        }
+    )
 
     # Timestamp
     df["timestamp_ms"] = pd.to_numeric(df["timestamp"], errors="coerce")
@@ -92,5 +94,14 @@ def load_recon_sl(
         df = df[df["node_id"].isin(keep)]
 
     return df[
-        ["node_id", "timestamp_ms", "datetime", "power_w", "voltage", "current", "energy_wh", "power_factor"]
+        [
+            "node_id",
+            "timestamp_ms",
+            "datetime",
+            "power_w",
+            "voltage",
+            "current",
+            "energy_wh",
+            "power_factor",
+        ]
     ].reset_index(drop=True)

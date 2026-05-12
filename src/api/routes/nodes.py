@@ -32,7 +32,9 @@ def _compute_status(node_id: str, first_seen_ms: Optional[int]) -> NodeStatus:
     now_ms = int(time.time() * 1000)
     days_since = (now_ms - first_seen_ms) / (24 * 3600 * 1000)
     learning_mode = days_since < LEARNING_PERIOD_DAYS
-    days_remaining = max(0.0, LEARNING_PERIOD_DAYS - days_since) if learning_mode else 0.0
+    days_remaining = (
+        max(0.0, LEARNING_PERIOD_DAYS - days_since) if learning_mode else 0.0
+    )
     return NodeStatus(
         node_id=node_id,
         learning_mode=learning_mode,

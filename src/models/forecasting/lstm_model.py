@@ -89,7 +89,11 @@ def train_from_df(
 
     X_all = np.concatenate(all_X)
     y_all = np.concatenate(all_y)
-    logger.info("Training on %d sequences from %d nodes", len(X_all), hourly_df["node_id"].nunique())
+    logger.info(
+        "Training on %d sequences from %d nodes",
+        len(X_all),
+        hourly_df["node_id"].nunique(),
+    )
 
     scaler = MinMaxScaler()
     scaler.fit(np.concatenate([X_all.flatten(), y_all.flatten()]).reshape(-1, 1))
@@ -101,7 +105,7 @@ def train_from_df(
     X_norm, y_norm = X_norm[idx], y_norm[idx]
 
     X_t = torch.FloatTensor(X_norm).unsqueeze(-1)  # (N, seq_len, 1)
-    y_t = torch.FloatTensor(y_norm)                # (N, 24)
+    y_t = torch.FloatTensor(y_norm)  # (N, 24)
     n = len(X_t)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -165,7 +169,9 @@ def _generate_bulb_hourly(
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     if DATA_SOURCE == "bulb":
         print("Generating synthetic bulb hourly data ...")
@@ -194,20 +200,25 @@ if __name__ == "__main__":
     mlflow.set_experiment(mlflow_experiment)
 
     with mlflow.start_run():
-        mlflow.log_params({
-            "dataset": mlflow_dataset,
-            "epochs": EPOCHS,
-            "batch_size": BATCH_SIZE,
-            "seq_len": SEQ_LEN,
-            "pred_len": PRED_LEN,
-        })
+        mlflow.log_params(
+            {
+                "dataset": mlflow_dataset,
+                "epochs": EPOCHS,
+                "batch_size": BATCH_SIZE,
+                "seq_len": SEQ_LEN,
+                "pred_len": PRED_LEN,
+            }
+        )
 
         model, scaler = train_from_df(hourly)
 
-        mlflow.log_metric("n_sequences", sum(
-            max(0, len(grp) - SEQ_LEN - PRED_LEN + 1)
-            for _, grp in hourly.groupby("node_id")
-        ))
+        mlflow.log_metric(
+            "n_sequences",
+            sum(
+                max(0, len(grp) - SEQ_LEN - PRED_LEN + 1)
+                for _, grp in hourly.groupby("node_id")
+            ),
+        )
 
     MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model, str(MODEL_OUT))

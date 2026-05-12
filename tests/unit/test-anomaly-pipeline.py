@@ -35,6 +35,7 @@ def clear_learning_mode_cache():
     _graduated_nodes.clear()
     _learning_mode_cache.clear()
 
+
 # ---------------------------------------------------------------------------
 # _write_to_postgres
 # ---------------------------------------------------------------------------
@@ -110,16 +111,26 @@ class TestRunStartup:
         # Stop the consumer loop immediately after one iteration
         mock_consumer.__iter__ = MagicMock(return_value=iter([]))
 
-        with patch("src.models.anomaly.pipeline.psycopg2.connect", return_value=mock_conn), \
-             patch("src.models.anomaly.pipeline._build_consumer", return_value=mock_consumer), \
-             patch("src.models.anomaly.pipeline._build_producer", return_value=MagicMock()), \
-             patch("src.models.anomaly.pipeline.MODEL_PATH") as mock_path:
+        with patch(
+            "src.models.anomaly.pipeline.psycopg2.connect", return_value=mock_conn
+        ), patch(
+            "src.models.anomaly.pipeline._build_consumer", return_value=mock_consumer
+        ), patch(
+            "src.models.anomaly.pipeline._build_producer", return_value=MagicMock()
+        ), patch(
+            "src.models.anomaly.pipeline.MODEL_PATH"
+        ) as mock_path:
 
-            mock_path.__truediv__ = lambda s, o: MagicMock(**{"exists.return_value": False})
+            mock_path.__truediv__ = lambda s, o: MagicMock(
+                **{"exists.return_value": False}
+            )
             # Should complete without SystemExit
             from src.models.anomaly import pipeline
+
             with patch.object(pipeline, "MODEL_PATH") as mp:
-                mp.__truediv__ = lambda s, o: MagicMock(**{"exists.return_value": False})
+                mp.__truediv__ = lambda s, o: MagicMock(
+                    **{"exists.return_value": False}
+                )
                 pipeline.run()  # must not raise
 
 
@@ -153,7 +164,9 @@ class TestBuildConsumerProducer:
 
 def _make_db_conn(first_seen_ms):
     cur = MagicMock()
-    cur.fetchone.return_value = (first_seen_ms,) if first_seen_ms is not None else (None,)
+    cur.fetchone.return_value = (
+        (first_seen_ms,) if first_seen_ms is not None else (None,)
+    )
     conn = MagicMock()
     conn.cursor.return_value.__enter__ = lambda s: cur
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)

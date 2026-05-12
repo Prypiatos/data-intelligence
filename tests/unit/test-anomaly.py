@@ -23,14 +23,16 @@ def _make_readings(n: int, seed: int = 42) -> list[dict]:
     for i in range(n):
         hour = rng.randint(8, 22)
         day = i % 14
-        readings.append({
-            "node_id": f"plug-{i % 5:02d}",
-            "timestamp": _ts(day, hour),
-            "voltage": 230.0,
-            "current": 0.26,
-            "power": 60.0,
-            "energy_wh": 0.083,
-        })
+        readings.append(
+            {
+                "node_id": f"plug-{i % 5:02d}",
+                "timestamp": _ts(day, hour),
+                "voltage": 230.0,
+                "current": 0.26,
+                "power": 60.0,
+                "energy_wh": 0.083,
+            }
+        )
     return readings
 
 
@@ -113,28 +115,34 @@ class TestSeverityScoring:
         readings = _make_readings(20, seed=99)
         results = detector.predict(readings)
         high_count = sum(1 for r in results if r["severity"] == "high")
-        assert high_count == 0, f"{high_count} daytime readings incorrectly flagged as high"
+        assert (
+            high_count == 0
+        ), f"{high_count} daytime readings incorrectly flagged as high"
 
     def test_anomalous_readings_flagged(self):
         """Device active at 3am should not score as normal when never active at night."""
         normal = _make_readings(300)
-        detector = AnomalyDetector(contamination=0.05, n_estimators=100, random_state=42)
+        detector = AnomalyDetector(
+            contamination=0.05, n_estimators=100, random_state=42
+        )
         detector.fit(normal)
         result = detector.predict([_anomalous_reading()])[0]
-        assert result["severity"] != "normal", (
-            f"Expected 3am reading to be flagged, got 'normal' (score={result['anomaly_score']})"
-        )
+        assert (
+            result["severity"] != "normal"
+        ), f"Expected 3am reading to be flagged, got 'normal' (score={result['anomaly_score']})"
 
     def test_score_is_lower_for_unusual_hour(self):
         """Anomaly score should be lower for a device active at an unusual hour."""
         normal = _make_readings(300)
-        detector = AnomalyDetector(contamination=0.05, n_estimators=100, random_state=42)
+        detector = AnomalyDetector(
+            contamination=0.05, n_estimators=100, random_state=42
+        )
         detector.fit(normal)
         normal_score = detector.predict([_normal_reading()])[0]["anomaly_score"]
         anomaly_score = detector.predict([_anomalous_reading()])[0]["anomaly_score"]
-        assert anomaly_score < normal_score, (
-            f"Expected anomaly score ({anomaly_score}) < normal score ({normal_score})"
-        )
+        assert (
+            anomaly_score < normal_score
+        ), f"Expected anomaly score ({anomaly_score}) < normal score ({normal_score})"
 
     def test_severity_thresholds_order(self):
         assert (
@@ -246,6 +254,7 @@ class TestSaveLoad:
     def test_predict_before_fit_raises_after_load_from_empty(self, tmp_path):
         """Loading a detector that was never fitted should still raise on predict."""
         import pickle
+
         (tmp_path / "detector.pkl").write_bytes(
             pickle.dumps({"model": None, "scaler": None})
         )

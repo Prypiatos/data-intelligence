@@ -37,10 +37,10 @@ from src.api.routes import forecasting as forecasting_module
 from src.models.anomaly.model import AnomalyDetector
 from src.models.forecasting.lstm_model import LSTMForecaster
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_readings(n: int, seed: int = 0) -> list[dict]:
     rng = random.Random(seed)
@@ -74,6 +74,7 @@ def _db_override(rows=None):
         mock_engine = MagicMock()
         mock_engine.connect.return_value = mock_conn
         return mock_engine
+
     return override
 
 
@@ -84,6 +85,7 @@ def api_client():
         forecasting_module.model = LSTMForecaster()
         forecasting_module.model.eval()
         from sklearn.preprocessing import MinMaxScaler
+
         forecasting_module.scaler = MinMaxScaler()
         forecasting_module.scaler.fit([[0], [800]])
         forecasting_module.device = torch.device("cpu")
@@ -96,6 +98,7 @@ def api_client():
 # Anomaly detection
 # ---------------------------------------------------------------------------
 
+
 class TestAnomalyDetectionPerf:
 
     def test_single_reading_under_5ms(self):
@@ -107,7 +110,9 @@ class TestAnomalyDetectionPerf:
         detector.predict([reading])
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert elapsed_ms < 5, f"Single prediction took {elapsed_ms:.1f}ms, expected < 5ms"
+        assert (
+            elapsed_ms < 5
+        ), f"Single prediction took {elapsed_ms:.1f}ms, expected < 5ms"
 
     def test_batch_100_under_50ms(self):
         """100 readings scored in under 50ms — batch scoring must stay snappy."""
@@ -131,24 +136,31 @@ class TestAnomalyDetectionPerf:
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         assert len(results) == 1000
-        assert elapsed_ms < 200, f"1000 readings took {elapsed_ms:.1f}ms, expected < 200ms"
+        assert (
+            elapsed_ms < 200
+        ), f"1000 readings took {elapsed_ms:.1f}ms, expected < 200ms"
 
     def test_fit_on_10k_readings_under_10s(self):
         """Fitting the model on 10 000 readings completes in under 10s.
         Retraining runs weekly — but it still shouldn't block for ages."""
         readings = _make_readings(10_000)
-        detector = AnomalyDetector(contamination=0.05, n_estimators=100, random_state=42)
+        detector = AnomalyDetector(
+            contamination=0.05, n_estimators=100, random_state=42
+        )
 
         start = time.perf_counter()
         detector.fit(readings)
         elapsed_s = time.perf_counter() - start
 
-        assert elapsed_s < 10, f"Fit on 10k readings took {elapsed_s:.1f}s, expected < 10s"
+        assert (
+            elapsed_s < 10
+        ), f"Fit on 10k readings took {elapsed_s:.1f}s, expected < 10s"
 
 
 # ---------------------------------------------------------------------------
 # LSTM forecasting
 # ---------------------------------------------------------------------------
+
 
 class TestLSTMInferencePerf:
 
@@ -163,7 +175,9 @@ class TestLSTMInferencePerf:
             model(X)
             elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert elapsed_ms < 50, f"LSTM inference took {elapsed_ms:.1f}ms, expected < 50ms"
+        assert (
+            elapsed_ms < 50
+        ), f"LSTM inference took {elapsed_ms:.1f}ms, expected < 50ms"
 
     def test_batch_32_under_200ms(self):
         """Batch of 32 forecasts under 200ms — matches training batch size."""
@@ -177,12 +191,15 @@ class TestLSTMInferencePerf:
             elapsed_ms = (time.perf_counter() - start) * 1000
 
         assert output.shape == (32, 24)
-        assert elapsed_ms < 200, f"Batch-32 LSTM took {elapsed_ms:.1f}ms, expected < 200ms"
+        assert (
+            elapsed_ms < 200
+        ), f"Batch-32 LSTM took {elapsed_ms:.1f}ms, expected < 200ms"
 
 
 # ---------------------------------------------------------------------------
 # API response time
 # ---------------------------------------------------------------------------
+
 
 class TestAPIResponsePerf:
 
@@ -213,17 +230,23 @@ class TestAPIResponsePerf:
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         assert r.status_code == 200
-        assert elapsed_ms < 200, f"/forecast/predict took {elapsed_ms:.1f}ms, expected < 200ms"
+        assert (
+            elapsed_ms < 200
+        ), f"/forecast/predict took {elapsed_ms:.1f}ms, expected < 200ms"
 
     def test_recommendations_under_200ms(self, api_client):
         """/recommendations generates on the fly — should still be fast with empty DB."""
-        with patch("src.api.routes.recommendations.run_recommendations", return_value=[]):
+        with patch(
+            "src.api.routes.recommendations.run_recommendations", return_value=[]
+        ):
             start = time.perf_counter()
             r = api_client.get("/recommendations")
             elapsed_ms = (time.perf_counter() - start) * 1000
 
         assert r.status_code == 200
-        assert elapsed_ms < 200, f"/recommendations took {elapsed_ms:.1f}ms, expected < 200ms"
+        assert (
+            elapsed_ms < 200
+        ), f"/recommendations took {elapsed_ms:.1f}ms, expected < 200ms"
 
     def test_concurrent_forecast_requests(self, api_client):
         """10 concurrent /forecast/predict calls all return 200 — no race conditions."""

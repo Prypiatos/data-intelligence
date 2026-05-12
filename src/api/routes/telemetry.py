@@ -27,13 +27,17 @@ class TelemetryReading(BaseModel):
 
 
 def _ms_to_rfc3339(ms: int) -> str:
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
 
 
 @router.get("/history", response_model=List[TelemetryReading])
 def get_telemetry_history(
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
-    start: Optional[int] = Query(None, description="Start time (Unix epoch ms, inclusive)"),
+    start: Optional[int] = Query(
+        None, description="Start time (Unix epoch ms, inclusive)"
+    ),
     end: Optional[int] = Query(None, description="End time (Unix epoch ms, inclusive)"),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     client: InfluxDBClient = Depends(get_influx_client),
@@ -64,14 +68,16 @@ def get_telemetry_history(
             for record in table.records:
                 ts_ms = int(record.get_time().timestamp() * 1000)
                 v = record.values
-                results.append(TelemetryReading(
-                    node_id=v.get("node_id", ""),
-                    timestamp=ts_ms,
-                    voltage=float(v.get("voltage") or 0),
-                    current=float(v.get("current") or 0),
-                    power=float(v.get("power") or 0),
-                    energy_wh=float(v.get("energy_wh") or 0),
-                ))
+                results.append(
+                    TelemetryReading(
+                        node_id=v.get("node_id", ""),
+                        timestamp=ts_ms,
+                        voltage=float(v.get("voltage") or 0),
+                        current=float(v.get("current") or 0),
+                        power=float(v.get("power") or 0),
+                        energy_wh=float(v.get("energy_wh") or 0),
+                    )
+                )
         return results
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"InfluxDB error: {e}")

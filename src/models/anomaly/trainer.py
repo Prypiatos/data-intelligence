@@ -109,6 +109,7 @@ def _load_bulb_readings(
 
     # Start 90 days ago so timestamps align with retention window
     import pendulum
+
     start_ms = int(pendulum.now("UTC").subtract(days=90).timestamp() * 1000)
 
     readings = []
@@ -140,19 +141,23 @@ def _load_bulb_readings(
             current = 0.0
             energy_wh = 0.0
 
-        readings.append({
-            "node_id": node_id,
-            "timestamp": int(ts_ms),
-            "voltage": round(voltage, 2),
-            "current": round(current, 4),
-            "power": round(power, 2),
-            "energy_wh": round(energy_wh, 6),
-        })
+        readings.append(
+            {
+                "node_id": node_id,
+                "timestamp": int(ts_ms),
+                "voltage": round(voltage, 2),
+                "current": round(current, 4),
+                "power": round(power, 2),
+                "energy_wh": round(energy_wh, 6),
+            }
+        )
 
         ts_ms += interval_sec * 1000
         remaining_in_state -= 1
 
-    print(f"Generated {len(readings):,} synthetic incandescent bulb readings ({rated_watts}W)")
+    print(
+        f"Generated {len(readings):,} synthetic incandescent bulb readings ({rated_watts}W)"
+    )
     return readings
 
 

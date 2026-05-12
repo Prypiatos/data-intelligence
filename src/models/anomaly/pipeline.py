@@ -76,7 +76,9 @@ def _try_cold_start_anomaly(conn):
     Returns a fitted AnomalyDetector saved to MODEL_PATH, or None if not ready yet.
     """
     with conn.cursor() as cur:
-        cur.execute("SELECT MIN(timestamp), MAX(timestamp), COUNT(*) FROM telemetry_readings")
+        cur.execute(
+            "SELECT MIN(timestamp), MAX(timestamp), COUNT(*) FROM telemetry_readings"
+        )
         row = cur.fetchone()
 
     if not row or row[0] is None or row[2] < 100:
@@ -85,7 +87,11 @@ def _try_cold_start_anomaly(conn):
 
     span_days = (row[1] - row[0]) / (24 * 3600 * 1000)
     if span_days < LEARNING_PERIOD_DAYS:
-        logger.info("Cold start: need %d days, have %.1f — waiting", LEARNING_PERIOD_DAYS, span_days)
+        logger.info(
+            "Cold start: need %d days, have %.1f — waiting",
+            LEARNING_PERIOD_DAYS,
+            span_days,
+        )
         return None
 
     with conn.cursor() as cur:
@@ -99,7 +105,11 @@ def _try_cold_start_anomaly(conn):
     detector = AnomalyDetector(contamination=contamination, n_estimators=100)
     detector.fit(readings)
     detector.save(MODEL_PATH)
-    logger.info("Cold start: anomaly model trained on %d readings, saved to %s", len(readings), MODEL_PATH)
+    logger.info(
+        "Cold start: anomaly model trained on %d readings, saved to %s",
+        len(readings),
+        MODEL_PATH,
+    )
     return detector
 
 
@@ -156,7 +166,8 @@ def run() -> None:
     else:
         logger.info(
             "No model at %s — collecting data for %d days before training",
-            MODEL_PATH, LEARNING_PERIOD_DAYS,
+            MODEL_PATH,
+            LEARNING_PERIOD_DAYS,
         )
         detector = None
 
@@ -178,7 +189,9 @@ def run() -> None:
             node_id = reading.get("node_id")
 
             if _is_learning_mode(conn, node_id):
-                logger.debug("Node %s in learning mode — skipping anomaly detection", node_id)
+                logger.debug(
+                    "Node %s in learning mode — skipping anomaly detection", node_id
+                )
                 continue
 
             if detector is None:

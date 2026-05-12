@@ -37,7 +37,9 @@ FORECAST_COLD_START_DAYS = int(os.getenv("FORECAST_COLD_START_DAYS", "30"))
 class LSTMForecastingModel:
     def __init__(self, model_path: str, scaler_path: str):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = torch.load(model_path, map_location=self.device, weights_only=False)
+        self.model = torch.load(
+            model_path, map_location=self.device, weights_only=False
+        )
         self.model.eval()
         with open(scaler_path, "rb") as f:
             self.scaler = pickle.load(f)
@@ -51,7 +53,9 @@ class LSTMForecastingModel:
             1-D array of FORECAST_HORIZON denormalized watt predictions
         """
         normalized = self.scaler.transform(power_sequence.reshape(-1, 1))
-        X = torch.FloatTensor(normalized).unsqueeze(0).to(self.device)  # (1, seq_len, 1)
+        X = (
+            torch.FloatTensor(normalized).unsqueeze(0).to(self.device)
+        )  # (1, seq_len, 1)
         with torch.no_grad():
             output = self.model(X)
         forecast = self.scaler.inverse_transform(
@@ -64,7 +68,11 @@ def _try_cold_start(engine) -> bool:
     """Train LSTM from energy_features when FORECAST_COLD_START_DAYS of data exists.
     Saves model and scaler to disk. Returns True if training succeeded.
     """
-    from src.models.forecasting.lstm_model import SEQ_LEN as _SEQ, PRED_LEN as _PRED, train_from_df
+    from src.models.forecasting.lstm_model import (
+        SEQ_LEN as _SEQ,
+        PRED_LEN as _PRED,
+        train_from_df,
+    )
 
     df = pd.read_sql(
         "SELECT node_id, timestamp, avg_power FROM energy_features WHERE avg_power IS NOT NULL ORDER BY node_id, timestamp",
@@ -76,7 +84,11 @@ def _try_cold_start(engine) -> bool:
 
     span_days = (df["timestamp"].max() - df["timestamp"].min()) / (24 * 3600 * 1000)
     if span_days < FORECAST_COLD_START_DAYS:
-        logger.info("Cold start: need %d days, have %.1f — waiting", FORECAST_COLD_START_DAYS, span_days)
+        logger.info(
+            "Cold start: need %d days, have %.1f — waiting",
+            FORECAST_COLD_START_DAYS,
+            span_days,
+        )
         return False
 
     min_rows = _SEQ + _PRED
@@ -84,7 +96,11 @@ def _try_cold_start(engine) -> bool:
         logger.info("Cold start: no node has %d hourly rows yet", min_rows)
         return False
 
-    logger.info("Cold start: training LSTM on %.1f days of real data (%d rows)", span_days, len(df))
+    logger.info(
+        "Cold start: training LSTM on %.1f days of real data (%d rows)",
+        span_days,
+        len(df),
+    )
     df_train = df.rename(columns={"avg_power": "power_w"})
     model, scaler = train_from_df(df_train)
 
@@ -123,14 +139,20 @@ def prepare_forecast_input(features_df: pd.DataFrame, seq_len: int = SEQ_LEN) ->
     for node_id, grp in features_df.groupby("node_id"):
         grp = grp.sort_values("timestamp")
         if len(grp) < seq_len:
-            logger.warning("Node %s has insufficient data (%d < %d)", node_id, len(grp), seq_len)
+            logger.warning(
+                "Node %s has insufficient data (%d < %d)", node_id, len(grp), seq_len
+            )
             continue
-        node_sequences[node_id] = grp["avg_power"].tail(seq_len).values.astype(np.float32)
+        node_sequences[node_id] = (
+            grp["avg_power"].tail(seq_len).values.astype(np.float32)
+        )
     logger.info("Prepared sequences for %d nodes", len(node_sequences))
     return node_sequences
 
 
-def generate_forecasts(model: LSTMForecastingModel, node_sequences: dict) -> pd.DataFrame:
+def generate_forecasts(
+    model: LSTMForecastingModel, node_sequences: dict
+) -> pd.DataFrame:
     forecasts = []
     current_timestamp = int(datetime.now().timestamp() * 1000)
 
@@ -138,11 +160,13 @@ def generate_forecasts(model: LSTMForecastingModel, node_sequences: dict) -> pd.
         try:
             predictions = model.predict(sequence)[:FORECAST_HORIZON]
             for hour_offset, value in enumerate(predictions):
-                forecasts.append({
-                    "node_id": node_id,
-                    "timestamp": current_timestamp + hour_offset * 3600 * 1000,
-                    "predicted_consumption": float(value),
-                })
+                forecasts.append(
+                    {
+                        "node_id": node_id,
+                        "timestamp": current_timestamp + hour_offset * 3600 * 1000,
+                        "predicted_consumption": float(value),
+                    }
+                )
         except Exception as e:
             logger.error("Error generating forecast for %s: %s", node_id, e)
 
@@ -215,8 +239,11 @@ def run_batch_pipeline() -> bool:
         log_to_mlflow(MODEL_PATH, len(df_forecasts), FORECAST_HORIZON)
 
         logger.info("=" * 60)
-        logger.info("Batch Forecasting Pipeline completed — %d forecasts across %d nodes",
-                    len(df_forecasts), len(node_sequences))
+        logger.info(
+            "Batch Forecasting Pipeline completed — %d forecasts across %d nodes",
+            len(df_forecasts),
+            len(node_sequences),
+        )
         logger.info("=" * 60)
         return True
 
