@@ -103,7 +103,9 @@ CREATE TABLE IF NOT EXISTS energy_features (
     UNIQUE(node_id, timestamp)
 );
 
-CREATE INDEX idx_energy_features_node_timestamp 
+CREATE INDEX IF NOT EXISTS idx_telemetry_node_id ON telemetry_readings(node_id);
+
+CREATE INDEX idx_energy_features_node_timestamp
 ON energy_features(node_id, timestamp);
 
 CREATE TABLE IF NOT EXISTS energy_analytics_hourly (

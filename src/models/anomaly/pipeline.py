@@ -3,6 +3,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from pathlib import Path
 
 import psycopg2
@@ -18,6 +19,9 @@ OUTPUT_TOPIC = "energy.anomalies"
 GROUP_ID = "anomaly-detection-group"
 MODEL_PATH = Path(os.getenv("ANOMALY_MODEL_PATH", "models/anomaly"))
 ANOMALY_TYPE = "consumption_anomaly"
+LEARNING_PERIOD_DAYS = int(os.getenv("LEARNING_PERIOD_DAYS", "30"))
+_LEARNING_PERIOD_MS = LEARNING_PERIOD_DAYS * 24 * 3600 * 1000
+_CACHE_TTL_SEC = 3600  # recheck learning mode once per hour per node
 
 POSTGRES_DSN = (
     f"host={os.getenv('POSTGRES_HOST', 'localhost')} "
@@ -26,6 +30,42 @@ POSTGRES_DSN = (
     f"user={os.getenv('POSTGRES_USER', 'energy_user')} "
     f"password={os.getenv('POSTGRES_PASSWORD', 'energy_pass')}"
 )
+
+# Nodes that have passed the learning period — never revert, so cache permanently
+_graduated_nodes: set = set()
+# Cache: node_id -> (check_time, is_learning_mode) — stores the actual result, not just the timestamp
+_learning_mode_cache: dict = {}
+
+
+def _is_learning_mode(conn, node_id: str) -> bool:
+    """Return True if the node has less than LEARNING_PERIOD_DAYS of data."""
+    if node_id in _graduated_nodes:
+        return False
+
+    now = time.time()
+    cached = _learning_mode_cache.get(node_id)
+    if cached and now - cached[0] < _CACHE_TTL_SEC:
+        return cached[1]
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT MIN(timestamp) FROM telemetry_readings WHERE node_id = %s",
+            (node_id,),
+        )
+        row = cur.fetchone()
+
+    if not row or row[0] is None:
+        _learning_mode_cache[node_id] = (now, True)
+        return True
+
+    if int(now * 1000) - row[0] >= _LEARNING_PERIOD_MS:
+        _graduated_nodes.add(node_id)
+        _learning_mode_cache.pop(node_id, None)
+        logger.info("Node %s graduated from learning mode", node_id)
+        return False
+
+    _learning_mode_cache[node_id] = (now, True)
+    return True
 
 
 def _build_consumer() -> KafkaConsumer:
@@ -97,6 +137,12 @@ def run() -> None:
     for message in consumer:
         try:
             reading = message.value
+            node_id = reading.get("node_id")
+
+            if _is_learning_mode(conn, node_id):
+                logger.debug("Node %s in learning mode — skipping anomaly detection", node_id)
+                continue
+
             results = detector.predict([reading])
             result = results[0]
 

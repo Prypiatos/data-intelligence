@@ -1,5 +1,6 @@
 """Unit tests for all FastAPI endpoints."""
 
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +20,23 @@ def _db_override(rows):
     def override():
         mock_result = MagicMock()
         mock_result.mappings.return_value.all.return_value = rows
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = lambda s: mock_conn
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        mock_conn.execute.return_value = mock_result
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value = mock_conn
+        return mock_engine
+
+    return override
+
+
+def _db_override_single(row):
+    """Return a get_db_engine dependency override for single-row queries (.one_or_none)."""
+
+    def override():
+        mock_result = MagicMock()
+        mock_result.mappings.return_value.one_or_none.return_value = row
         mock_conn = MagicMock()
         mock_conn.__enter__ = lambda s: mock_conn
         mock_conn.__exit__ = MagicMock(return_value=False)
@@ -268,3 +286,92 @@ class TestGetRecommendations:
             side_effect=Exception("db error"),
         ):
             assert client.get("/recommendations").status_code == 503
+
+
+# ============================================================
+# GET /nodes
+# ============================================================
+
+_now_ms = int(time.time() * 1000)
+_day_ms = 24 * 3600 * 1000
+
+NODE_ROWS = [
+    {"node_id": "node_001", "first_seen_ms": _now_ms - 2 * _day_ms},   # 2 days old — learning
+    {"node_id": "node_002", "first_seen_ms": _now_ms - 35 * _day_ms},  # 35 days old — active
+]
+
+
+class TestGetNodes:
+    def test_returns_200(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(NODE_ROWS)
+        assert client.get("/nodes").status_code == 200
+
+    def test_returns_list(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(NODE_ROWS)
+        data = client.get("/nodes").json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+
+    def test_response_schema(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override(NODE_ROWS)
+        record = client.get("/nodes").json()[0]
+        assert "node_id" in record
+        assert "learning_mode" in record
+        assert "days_remaining" in record
+
+    def test_recent_node_is_in_learning_mode(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([NODE_ROWS[0]])
+        data = client.get("/nodes").json()
+        assert data[0]["learning_mode"] is True
+
+    def test_old_node_is_not_in_learning_mode(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([NODE_ROWS[1]])
+        data = client.get("/nodes").json()
+        assert data[0]["learning_mode"] is False
+
+    def test_active_node_has_zero_days_remaining(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([NODE_ROWS[1]])
+        data = client.get("/nodes").json()
+        assert data[0]["days_remaining"] == 0.0
+
+    def test_returns_empty_list_when_no_nodes(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override([])
+        assert client.get("/nodes").json() == []
+
+    def test_returns_503_on_db_error(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override_error()
+        assert client.get("/nodes").status_code == 503
+
+
+# ============================================================
+# GET /nodes/{node_id}/status
+# ============================================================
+
+
+class TestGetNodeStatus:
+    def test_returns_200_for_known_node(self, client):
+        row = {"first_seen_ms": _now_ms - 2 * _day_ms}
+        app.dependency_overrides[get_db_engine] = _db_override_single(row)
+        assert client.get("/nodes/node_001/status").status_code == 200
+
+    def test_response_schema(self, client):
+        row = {"first_seen_ms": _now_ms - 2 * _day_ms}
+        app.dependency_overrides[get_db_engine] = _db_override_single(row)
+        data = client.get("/nodes/node_001/status").json()
+        assert "node_id" in data
+        assert "learning_mode" in data
+        assert "days_remaining" in data
+
+    def test_node_id_in_response_matches_path(self, client):
+        row = {"first_seen_ms": _now_ms - 2 * _day_ms}
+        app.dependency_overrides[get_db_engine] = _db_override_single(row)
+        data = client.get("/nodes/node_001/status").json()
+        assert data["node_id"] == "node_001"
+
+    def test_returns_404_for_unknown_node(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override_single(None)
+        assert client.get("/nodes/unknown_node/status").status_code == 404
+
+    def test_returns_503_on_db_error(self, client):
+        app.dependency_overrides[get_db_engine] = _db_override_error()
+        assert client.get("/nodes/node_001/status").status_code == 503

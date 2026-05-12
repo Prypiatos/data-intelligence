@@ -33,15 +33,70 @@ Liveness check. Call this on app startup to confirm E2 is reachable before rende
 
 ---
 
+### GET /nodes
+
+Returns all known nodes with their learning mode status. Use this as your dashboard entry point — load this first to know which nodes exist and whether anomaly detection is active for each.
+
+**Response `200`:**
+```json
+[
+  {
+    "node_id": "node_001",
+    "learning_mode": true,
+    "first_seen_ms": 1714800000000,
+    "days_since_first_seen": 5.2,
+    "days_remaining": 24.8
+  },
+  {
+    "node_id": "node_002",
+    "learning_mode": false,
+    "first_seen_ms": 1712000000000,
+    "days_since_first_seen": 38.1,
+    "days_remaining": 0.0
+  }
+]
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `node_id` | string | Device/meter identifier |
+| `learning_mode` | boolean | `true` = still collecting data, anomaly detection not yet active |
+| `first_seen_ms` | integer | Unix epoch ms of the first reading ever received from this node |
+| `days_since_first_seen` | float | How many days since the node was first seen |
+| `days_remaining` | float | Days until anomaly detection activates. `0.0` when active |
+
+**If `learning_mode` is `true`:** show "Learning mode — X days remaining" instead of an anomaly panel. No anomalies will be generated for this node yet.
+
+**If `learning_mode` is `false`:** anomaly detection is active. Show the anomaly panel and poll `/anomalies?node_id=...`.
+
+Returns an empty array `[]` if no nodes have sent data yet.
+
+---
+
+### GET /nodes/{node_id}/status
+
+Returns learning mode status for a single node.
+
+**Example request:**
+```
+GET /nodes/node_001/status
+```
+
+**Response `200`:** same shape as a single object from `GET /nodes`.
+
+**Response `404`:** node not found (no readings received yet).
+
+---
+
 ### GET /anomalies
 
-Returns detected energy anomalies. Use this to populate alert lists, dashboards, or node-level detail views.
+Returns detected energy anomalies. Only call this for nodes where `learning_mode` is `false`. Returns an empty array for nodes still in learning mode since no anomalies are generated during that period.
 
 **Query parameters:**
 
 | Parameter | Type | Default | Max | Description |
 |---|---|---|---|---|
-| `node_id` | string | — | — | Filter to a specific meter/device |
+| `node_id` | string | — | — | Filter to a specific node |
 | `severity` | string | — | — | Filter by `"high"`, `"medium"`, or `"low"` |
 | `limit` | integer | 100 | 1000 | Max records returned |
 
@@ -56,7 +111,7 @@ GET /anomalies?node_id=node_001&severity=high&limit=20
   {
     "node_id": "node_001",
     "timestamp": 1714800000000,
-    "anomaly_type": "theft_or_leakage",
+    "anomaly_type": "consumption_anomaly",
     "score": -0.18,
     "severity": "high"
   }
@@ -66,20 +121,22 @@ GET /anomalies?node_id=node_001&severity=high&limit=20
 | Field | Type | Notes |
 |---|---|---|
 | `node_id` | string | Device/meter identifier |
-| `timestamp` | integer | Unix epoch milliseconds — see timestamp section below |
-| `anomaly_type` | string | Currently always `"theft_or_leakage"` |
+| `timestamp` | integer | Unix epoch milliseconds |
+| `anomaly_type` | string | Currently always `"consumption_anomaly"` |
 | `score` | float | Isolation Forest anomaly score — see score section below |
-| `severity` | string | `"high"`, `"medium"`, or `"low"` — see severity section below |
+| `severity` | string | `"high"`, `"medium"`, or `"low"` |
 
 Returns an empty array `[]` if no anomalies exist. Not a 404.
 
-**Only non normal readings are stored.** The `severity` field will never be `"normal"` in this response. Those readings are filtered at the pipeline level.
+**Only non-normal readings are stored.** The `severity` field will never be `"normal"` in this response.
 
 #### Anomaly score interpretation
 
+The model detects nodes operating outside their learned normal hours — e.g. a device active at 3am when it is never active at night.
+
 | Score range | Severity | Meaning |
 |---|---|---|
-| ≤ −0.15 | `high` | Strong anomaly — likely meter fault or energy theft |
+| ≤ −0.15 | `high` | Strong anomaly — device active at highly unusual hour |
 | −0.15 to −0.05 | `medium` | Moderate anomaly — worth investigating |
 | −0.05 to 0.0 | `low` | Mild deviation — monitor |
 
@@ -89,9 +146,9 @@ More negative = more anomalous. Scores above 0 are normal and not stored.
 
 ### GET /recommendations
 
-Returns energy optimization recommendations derived from anomaly data. Use this for the recommendations panel or notification feed.
+Returns energy optimization recommendations derived from anomaly data and forecasts. Use this for the recommendations panel or notification feed.
 
-**Important:** This endpoint generates results live on each call by querying the last 6 hours of anomaly data and 24 hour forecasts. Response time is typically under 200 ms but may be slower under heavy DB load. 
+**Important:** Generates results live on each call by querying the last 6 hours of anomaly data and 24-hour forecasts. Response time is typically under 200 ms.
 
 **Response `200`:**
 ```json
@@ -112,29 +169,29 @@ Returns energy optimization recommendations derived from anomaly data. Use this 
 | `node_id` | string | Device/meter identifier |
 | `type` | string | `"high_anomaly"`, `"load_shift"`, or `"high_consumption"` |
 | `severity` | string | `"high"`, `"medium"`, or `"low"` |
-| `message` | string | Ready-to-display text - no formatting needed |
+| `message` | string | Ready-to-display text — no formatting needed |
 | `generated_at` | string | ISO 8601 datetime with UTC offset |
-| `metadata` | object | Additional context - may be empty `{}` |
+| `metadata` | object | Additional context — may be empty `{}` |
 
 **Recommendation types:**
 
 | Type | Trigger | Meaning for user |
 |---|---|---|
-| `high_anomaly` | Node has multiple high-severity anomalies in last 6h | Possible meter fault or energy theft — inspect hardware |
+| `high_anomaly` | Node has high/medium severity anomalies in last 6h | Device operating at unusual hours — inspect |
 | `load_shift` | Forecasted consumption peaks in top 10% | Suggest shifting load away from peak hours |
-| `high_consumption` | Predicted consumption exceeds 800W threshold | Unusually high usage - review connected devices |
+| `high_consumption` | Predicted consumption exceeds 800W | Unusually high usage — review connected devices |
 
 ---
 
 ### GET /forecast/forecasts
 
-Returns stored 24 hour load forecasts from the database. Use this to display forecast charts per node.
+Returns stored 24-hour load forecasts. Use this to display forecast charts per node.
 
 **Query parameters:**
 
 | Parameter | Type | Default | Max | Description |
 |---|---|---|---|---|
-| `node_id` | string | — | — | Filter to a specific meter/device |
+| `node_id` | string | — | — | Filter to a specific node |
 | `limit` | integer | 100 | 1000 | Max records returned |
 
 **Response `200`:**
@@ -154,19 +211,19 @@ Returns stored 24 hour load forecasts from the database. Use this to display for
 | `timestamp` | integer | Unix epoch milliseconds of the forecast point |
 | `predicted_consumption` | float | Predicted power in watts |
 
-Returns an empty array `[]` if no forecasts have been generated yet. Forecasts are populated by the Airflow model retraining DAG. They may be empty on a fresh system.
+Returns an empty array `[]` if no forecasts have been generated yet.
 
 ---
 
 ### GET /telemetry/history
 
-Returns raw sensor readings from individual meters. Use this to display detailed historical charts or per-reading data for a specific node.
+Returns raw sensor readings. Use this for detailed historical charts or per-reading data.
 
 **Query parameters:**
 
 | Parameter | Type | Default | Max | Description |
 |---|---|---|---|---|
-| `node_id` | string | — | — | Filter to a specific meter/device |
+| `node_id` | string | — | — | Filter to a specific node |
 | `start` | integer | — | — | Start time (Unix epoch ms, inclusive) |
 | `end` | integer | — | — | End time (Unix epoch ms, inclusive) |
 | `limit` | integer | 100 | 1000 | Max records returned |
@@ -183,9 +240,9 @@ GET /telemetry/history?node_id=node_001&start=1714800000000&end=1714886400000
     "node_id": "node_001",
     "timestamp": 1714800000000,
     "voltage": 230.5,
-    "current": 10.5,
-    "power": 2420.25,
-    "energy_wh": 0.67
+    "current": 0.26,
+    "power": 60.0,
+    "energy_wh": 0.083
   }
 ]
 ```
@@ -195,34 +252,29 @@ GET /telemetry/history?node_id=node_001&start=1714800000000&end=1714886400000
 | `node_id` | string | Device/meter identifier |
 | `timestamp` | integer | Unix epoch milliseconds |
 | `voltage` | float | Volts |
-| `current` | float | Amps |
-| `power` | float | Watts (instantaneous) |
+| `current` | float | Amps — can be 0.0 when device is off |
+| `power` | float | Watts — can be 0.0 when device is off |
 | `energy_wh` | float | Energy in watt-hours for this reading interval |
 
-Results are ordered newest first. Returns an empty array `[]` if no readings exist for the given filters.
+Results are ordered newest first. Returns an empty array `[]` if no readings exist.
 
-> **Note:** Raw readings are high-frequency. Always provide `start`/`end` or a low `limit` to avoid large responses. For charting over longer periods, prefer `/analytics/hourly` or `/analytics/daily`.
+> **Note:** Raw readings are high-frequency. Always provide `start`/`end` or a low `limit`. For charting over longer periods, prefer `/analytics/hourly` or `/analytics/daily`.
 
 ---
 
 ### GET /analytics/hourly
 
-Returns hourly energy consumption rollups produced by the Spark batch pipeline. Use this for trend charts, hourly breakdowns, or per-division comparisons.
+Returns hourly energy consumption rollups. Use this for trend charts or hourly breakdowns.
 
 **Query parameters:**
 
 | Parameter | Type | Default | Max | Description |
 |---|---|---|---|---|
-| `node_id` | string | — | — | Filter to a specific meter/device |
+| `node_id` | string | — | — | Filter to a specific node |
 | `division` | string | — | — | Filter by building division |
 | `start` | integer | — | — | Start time (Unix epoch ms, inclusive) |
 | `end` | integer | — | — | End time (Unix epoch ms, inclusive) |
 | `limit` | integer | 100 | 1000 | Max records returned |
-
-**Example request:**
-```
-GET /analytics/hourly?node_id=node_001&start=1714800000000&end=1714886400000
-```
 
 **Response `200`:**
 ```json
@@ -249,28 +301,23 @@ GET /analytics/hourly?node_id=node_001&start=1714800000000&end=1714886400000
 | `peak_power_w` | float\|null | Peak power in watts over the hour |
 | `reading_count` | integer\|null | Number of raw readings that contributed |
 
-Results are ordered newest first. Returns an empty array `[]` if the Spark pipeline has not yet run.
+Returns an empty array `[]` if the Spark pipeline has not yet run.
 
 ---
 
 ### GET /analytics/daily
 
-Returns daily energy consumption rollups produced by the Spark batch pipeline. Use this for daily summaries, weekly comparison views, or long-range trend charts.
+Returns daily energy consumption rollups. Use this for daily summaries or long-range trend charts.
 
 **Query parameters:**
 
 | Parameter | Type | Default | Max | Description |
 |---|---|---|---|---|
-| `node_id` | string | — | — | Filter to a specific meter/device |
+| `node_id` | string | — | — | Filter to a specific node |
 | `division` | string | — | — | Filter by building division |
 | `start` | string | — | — | Start date (YYYY-MM-DD, inclusive) |
 | `end` | string | — | — | End date (YYYY-MM-DD, inclusive) |
 | `limit` | integer | 100 | 1000 | Max records returned |
-
-**Example request:**
-```
-GET /analytics/daily?node_id=node_001&start=2024-05-01&end=2024-05-07
-```
 
 **Response `200`:**
 ```json
@@ -293,11 +340,11 @@ GET /analytics/daily?node_id=node_001&start=2024-05-01&end=2024-05-07
 | `division` | string\|null | Building/division grouping — may be null |
 | `date` | string | ISO 8601 date (YYYY-MM-DD) |
 | `total_consumption_wh` | float | Total energy consumed that day |
-| `avg_power_w` | float\|null | Average power in watts over the day |
-| `peak_power_w` | float\|null | Peak power in watts over the day |
+| `avg_power_w` | float\|null | Average power in watts |
+| `peak_power_w` | float\|null | Peak power in watts |
 | `reading_count` | integer\|null | Number of raw readings that contributed |
 
-Results are ordered newest first. Returns an empty array `[]` if the Spark pipeline has not yet run.
+Returns an empty array `[]` if the Spark pipeline has not yet run.
 
 ---
 
@@ -307,19 +354,17 @@ Live stream of Flink window summaries over WebSocket. Connect once and receive d
 
 **URL:** `ws://localhost:8000/ws/live` (local dev) / `ws://energy-api:8000/ws/live` (Docker)
 
-**Connection:** Open and keep alive. The server pushes a message every time a new 2-second window is computed by Flink.
-
 **Message format:**
 ```json
 {
   "node_id": "node_001",
   "window_start": 1714800000000,
   "window_end": 1714800002000,
-  "avg_power": 487.3,
-  "max_power": 512.1,
+  "avg_power": 60.0,
+  "max_power": 60.2,
   "avg_voltage": 230.0,
-  "avg_current": 2.1,
-  "avg_energy_wh": 10.5,
+  "avg_current": 0.26,
+  "avg_energy_wh": 0.083,
   "record_count": 4
 }
 ```
@@ -327,25 +372,25 @@ Live stream of Flink window summaries over WebSocket. Connect once and receive d
 | Field | Type | Notes |
 |---|---|---|
 | `node_id` | string | Device/meter identifier |
-| `window_start` | integer | Unix epoch milliseconds — start of the 2-second window |
-| `window_end` | integer | Unix epoch milliseconds — end of the 2-second window |
+| `window_start` | integer | Unix epoch ms — start of the 2-second window |
+| `window_end` | integer | Unix epoch ms — end of the 2-second window |
 | `avg_power` | float | Average power in watts over the window |
 | `max_power` | float | Peak power in watts over the window |
 | `avg_voltage` | float | Average voltage over the window |
 | `avg_current` | float | Average current over the window |
 | `avg_energy_wh` | float | Average energy in watt-hours over the window |
-| `record_count` | integer | Number of readings that contributed to this window |
+| `record_count` | integer | Number of readings in this window |
 
-**Keepalive:** If no data arrives within 30 seconds the server sends `{"type": "ping"}` — ignore this in your message handler.
+**Keepalive:** If no data arrives within 30 seconds the server sends `{"type": "ping"}` — ignore in your message handler.
 
-**Error message:** If Kafka is unreachable the server sends `{"error": "..."}` and the connection stays open.
+**Error:** If Kafka is unreachable the server sends `{"error": "..."}` and the connection stays open.
 
 ```js
 const ws = new WebSocket("ws://localhost:8000/ws/live");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  if (data.type === "ping") return; // keepalive, ignore
+  if (data.type === "ping") return;
   if (data.error) { console.error("Stream error:", data.error); return; }
   // handle live window summary
 };
@@ -358,6 +403,7 @@ ws.onmessage = (event) => {
 | Status | Meaning | What to do |
 |---|---|---|
 | `400` | Bad request — invalid input | Fix the request parameters |
+| `404` | Resource not found | Node does not exist or has no data yet |
 | `503` | E2 database or model unavailable | Retry with exponential backoff — start at 2 s, cap at 30 s |
 
 Error body always:
@@ -369,30 +415,33 @@ Error body always:
 
 ## Node discovery
 
-There is no `/nodes` endpoint. E3 cannot query E2 for the list of available node IDs. Node IDs come from E1 (the edge devices). Coordinate with E1 to get the list of active node IDs, or display data dynamically based on what appears in `/anomalies` and `/forecast/forecasts` responses.
+Call `GET /nodes` to get all active nodes and their status. This is the correct starting point for building a node list or dashboard. Node IDs originate from E1 (edge devices) — you do not need to hardcode them.
+
+**Recommended dashboard flow:**
+1. On page load call `GET /nodes`
+2. For each node: if `learning_mode: true` → show "Learning mode — X days remaining"
+3. For each node: if `learning_mode: false` → show anomaly panel, poll `/anomalies?node_id=...`
 
 ---
 
 ## Pagination
 
-There is no cursor or offset pagination. Use the `limit` parameter (max 1000). If you need all records beyond 1000, contact E2. We can add offset support.
+No cursor/offset pagination. Use the `limit` parameter (max 1000). Contact E2 if you need offset support.
 
 ---
 
 ## Timestamps
 
-All `timestamp` fields are **Unix epoch milliseconds** (13 digit integers). Convert to local time in the UI:
+All `timestamp` fields are **Unix epoch milliseconds** (13-digit integers).
 
 ```js
-// JavaScript
 new Date(1714800000000).toLocaleString()
 
-// Or with a formatting library
 import { format } from 'date-fns';
 format(new Date(1714800000000), 'dd MMM yyyy HH:mm')
 ```
 
-`generated_at` on recommendations is an ISO 8601 string with UTC offset — parse directly with `new Date(generated_at)`.
+`generated_at` on recommendations is ISO 8601 — parse with `new Date(generated_at)`.
 
 ---
 
@@ -406,13 +455,14 @@ CORS is enabled. If you hit browser CORS errors, share your origin URL with E2 a
 
 | Endpoint | Suggested approach |
 |---|---|
-| `/ws/live` | Connect once — server pushes data as it arrives |
-| `/anomalies` | Poll every 30–60 s for live alert feeds |
-| `/recommendations` | Poll every 60 s maximum — generates live on each call |
+| `/ws/live` | Connect once — server pushes data |
+| `/nodes` | Poll every 60 s to track learning mode progress |
+| `/anomalies` | Poll every 30–60 s for nodes where `learning_mode: false` |
+| `/recommendations` | Poll every 60 s maximum |
 | `/forecast/forecasts` | Load once on page load, refresh every few minutes |
-| `/telemetry/history` | Load on demand (user selects time range) — not for polling |
-| `/analytics/hourly` | Load on demand or once on page load for trend charts |
-| `/analytics/daily` | Load on demand or once on page load for daily summaries |
+| `/telemetry/history` | Load on demand (user selects time range) |
+| `/analytics/hourly` | Load on demand or once on page load |
+| `/analytics/daily` | Load on demand or once on page load |
 | `/health` | Once on app startup |
 
 ---
@@ -422,34 +472,40 @@ CORS is enabled. If you hit browser CORS errors, share your origin URL with E2 a
 ```js
 const BASE = "http://localhost:8000";
 
-// Get high-severity anomalies for a node
-const anomalies = await fetch(`${BASE}/anomalies?node_id=node_001&severity=high`)
-  .then(r => r.json());
-// Returns: [{ node_id, timestamp, anomaly_type, score, severity }, ...]
+// 1. Load all nodes and their status
+const nodes = await fetch(`${BASE}/nodes`).then(r => r.json());
+// Returns: [{ node_id, learning_mode, days_remaining, ... }, ...]
+
+// 2. For each node, check learning mode
+for (const node of nodes) {
+  if (node.learning_mode) {
+    console.log(`${node.node_id}: learning mode — ${node.days_remaining} days remaining`);
+  } else {
+    // 3. Fetch anomalies for active nodes
+    const anomalies = await fetch(`${BASE}/anomalies?node_id=${node.node_id}&severity=high`)
+      .then(r => r.json());
+    console.log(`${node.node_id}: ${anomalies.length} high-severity anomalies`);
+  }
+}
 
 // Get recommendations
-const recs = await fetch(`${BASE}/recommendations`)
-  .then(r => r.json());
-// Returns: [{ node_id, type, severity, message, generated_at, metadata }, ...]
-
-// Convert timestamp to display time
-const displayTime = new Date(anomalies[0]?.timestamp).toLocaleString();
+const recs = await fetch(`${BASE}/recommendations`).then(r => r.json());
 
 // Get raw telemetry for a node over the last 24 hours
 const now = Date.now();
 const oneDayAgo = now - 24 * 60 * 60 * 1000;
-const readings = await fetch(`${BASE}/telemetry/history?node_id=node_001&start=${oneDayAgo}&end=${now}`)
-  .then(r => r.json());
-// Returns: [{ node_id, timestamp, voltage, current, power, energy_wh }, ...]
+const readings = await fetch(
+  `${BASE}/telemetry/history?node_id=node_001&start=${oneDayAgo}&end=${now}`
+).then(r => r.json());
 
-// Get hourly rollups for a node over the last 7 days
+// Get hourly rollups for the last 7 days
 const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-const hourly = await fetch(`${BASE}/analytics/hourly?node_id=node_001&start=${sevenDaysAgo}&end=${now}`)
-  .then(r => r.json());
-// Returns: [{ node_id, division, hour_start, total_consumption_wh, avg_power_w, peak_power_w, reading_count }, ...]
+const hourly = await fetch(
+  `${BASE}/analytics/hourly?node_id=node_001&start=${sevenDaysAgo}&end=${now}`
+).then(r => r.json());
 
 // Get daily rollups for a date range
-const daily = await fetch(`${BASE}/analytics/daily?node_id=node_001&start=2024-05-01&end=2024-05-07`)
-  .then(r => r.json());
-// Returns: [{ node_id, division, date, total_consumption_wh, avg_power_w, peak_power_w, reading_count }, ...]
+const daily = await fetch(
+  `${BASE}/analytics/daily?node_id=node_001&start=2024-05-01&end=2024-05-07`
+).then(r => r.json());
 ```
