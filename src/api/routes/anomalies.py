@@ -22,7 +22,7 @@ class AnomalyRecord(BaseModel):
 def get_anomalies(
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
     severity: Optional[str] = Query(
-        None, description="Filter by severity: high, medium, normal"
+        None, description="Filter by severity: high, medium, low"
     ),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     engine: Engine = Depends(get_db_engine),

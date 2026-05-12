@@ -168,7 +168,7 @@ Returns energy optimization recommendations derived from anomaly data and foreca
 |---|---|---|
 | `node_id` | string | Device/meter identifier |
 | `type` | string | `"high_anomaly"`, `"load_shift"`, or `"high_consumption"` |
-| `severity` | string | `"high"`, `"medium"`, or `"low"` |
+| `severity` | string | `"high"` or `"medium"` — recommendations are never `"low"` |
 | `message` | string | Ready-to-display text — no formatting needed |
 | `generated_at` | string | ISO 8601 datetime with UTC offset |
 | `metadata` | object | Additional context — may be empty `{}` |
