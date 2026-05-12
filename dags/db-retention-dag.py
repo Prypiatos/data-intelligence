@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from src.api.dependencies import get_db_engine
 
-RETENTION_DAYS = 90
+RETENTION_DAYS = 30
 
 # Tables with a millisecond epoch timestamp column
 EPOCH_MS_TABLES = [
