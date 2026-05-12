@@ -185,13 +185,13 @@ def write_forecasts_to_db(engine, df_forecasts: pd.DataFrame) -> None:
 
 
 def log_to_mlflow(model_path: str, num_predictions: int, forecast_horizon: int) -> None:
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment("batch-forecasting")
-    with mlflow.start_run():
-        mlflow.log_param("model_path", model_path)
-        mlflow.log_param("forecast_horizon", forecast_horizon)
-        mlflow.log_metric("num_predictions", num_predictions)
-        mlflow.log_metric("timestamp", int(datetime.now().timestamp()))
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)  # type: ignore[attr-defined]
+    mlflow.set_experiment("batch-forecasting")  # type: ignore[attr-defined]
+    with mlflow.start_run():  # type: ignore[attr-defined]
+        mlflow.log_param("model_path", model_path)  # type: ignore[attr-defined]
+        mlflow.log_param("forecast_horizon", forecast_horizon)  # type: ignore[attr-defined]
+        mlflow.log_metric("num_predictions", num_predictions)  # type: ignore[attr-defined]
+        mlflow.log_metric("timestamp", int(datetime.now().timestamp()))  # type: ignore[attr-defined]
     logger.info("Logged batch pipeline run to MLflow")
 
 

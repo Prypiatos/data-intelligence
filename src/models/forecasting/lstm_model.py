@@ -196,11 +196,11 @@ if __name__ == "__main__":
         mlflow_dataset = "RECON-SL"
         mlflow_experiment = "lstm-forecasting-recon-sl"
 
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))
-    mlflow.set_experiment(mlflow_experiment)
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))  # type: ignore[attr-defined]
+    mlflow.set_experiment(mlflow_experiment)  # type: ignore[attr-defined]
 
-    with mlflow.start_run():
-        mlflow.log_params(
+    with mlflow.start_run():  # type: ignore[attr-defined]
+        mlflow.log_params(  # type: ignore[attr-defined]
             {
                 "dataset": mlflow_dataset,
                 "epochs": EPOCHS,
@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
         model, scaler = train_from_df(hourly)
 
-        mlflow.log_metric(
+        mlflow.log_metric(  # type: ignore[attr-defined]
             "n_sequences",
             sum(
                 max(0, len(grp) - SEQ_LEN - PRED_LEN + 1)
