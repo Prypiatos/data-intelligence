@@ -230,7 +230,8 @@ def retrain_anomaly_model(**context):
 
     run_name = f"anomaly_retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     with mlflow.start_run(run_name=run_name) as run:
-        detector = AnomalyDetector(contamination=0.05, n_estimators=100)
+        contamination = float(os.getenv("ANOMALY_CONTAMINATION", "0.01"))
+        detector = AnomalyDetector(contamination=contamination, n_estimators=100)
         detector.fit(readings)
 
         mlflow.log_params(
