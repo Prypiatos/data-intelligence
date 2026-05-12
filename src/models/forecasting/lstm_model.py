@@ -14,7 +14,7 @@ import os
 import pickle
 from pathlib import Path
 
-import mlflow
+import mlflow  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 import torch

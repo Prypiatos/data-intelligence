@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import torch
 from sqlalchemy import create_engine
-import mlflow
-import mlflow.pytorch
+import mlflow  # type: ignore[import-untyped]
+import mlflow.pytorch  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 load_dotenv()
