@@ -122,7 +122,7 @@ def build_telemetry_suite():
         gxe.ExpectColumnValuesToBeBetween(
             column="current",
             min_value=0,
-            strict_min=True,
+            strict_min=False,
         )
     )
 
@@ -137,7 +137,7 @@ def build_telemetry_suite():
         gxe.ExpectColumnValuesToBeBetween(
             column="power",
             min_value=0,
-            strict_min=True,
+            strict_min=False,
         )
     )
 

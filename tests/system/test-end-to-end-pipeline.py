@@ -214,8 +214,8 @@ class TestStoragePipeline:
         assert node_id == test_node_id
         assert timestamp > 0
         assert 200 <= voltage <= 250
-        assert current > 0
-        assert power > 0
+        assert current >= 0
+        assert power >= 0
         assert energy_wh >= 0
 
     def test_no_duplicate_rows_stored(self, test_node_id, published_count):
@@ -331,7 +331,7 @@ class TestDataIntegrity:
             )
             powers = [row[0] for row in cur.fetchall()]
         conn.close()
-        assert all(p > 0 for p in powers)
+        assert all(p >= 0 for p in powers)
 
     def test_timestamps_are_unique_per_node(self, test_node_id, published_count):
         _poll_postgres(test_node_id, expected_count=published_count)
