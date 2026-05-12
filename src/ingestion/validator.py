@@ -23,12 +23,12 @@ def validate_telemetry(data):
     if not 1000000000000 <= data["timestamp"] <= 9999999999999:
         return False, "timestamp must be a 13-digit epoch in milliseconds"
 
-    # voltage must be numeric and within 200-250V
+    # voltage must be numeric: 0 (device off) or 200-250V (device on)
     if not isinstance(data["voltage"], (int, float)):
         return False, "voltage must be a number"
 
-    if not 200 <= data["voltage"] <= 250:
-        return False, "voltage must be between 200 and 250"
+    if not (data["voltage"] == 0 or 200 <= data["voltage"] <= 250):
+        return False, "voltage must be 0 (device off) or between 200 and 250"
 
     # current must be numeric and greater than 0
     if not isinstance(data["current"], (int, float)):

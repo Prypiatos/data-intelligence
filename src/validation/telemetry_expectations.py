@@ -106,7 +106,7 @@ def build_telemetry_suite():
     suite.add_expectation(
         gxe.ExpectColumnValuesToBeBetween(
             column="voltage",
-            min_value=200,
+            min_value=0,
             max_value=250,
         )
     )

@@ -59,7 +59,7 @@ All payloads must be valid JSON. **One reading per message**. Do not batch multi
 |---|---|---|
 | `node_id` | string | Non-empty, matches topic segment, max 64 chars |
 | `timestamp` | integer | Unix epoch **milliseconds** (13 digits) |
-| `voltage` | float | 200 – 250 V (inclusive) — outside this range is rejected |
+| `voltage` | float | 0 (device off) or 200 – 250 V (device on) — other values are rejected |
 | `current` | float | ≥ 0 — can be 0.0 when device is off |
 | `power` | float | ≥ 0 (watts) — can be 0.0 when device is off |
 | `energy_wh` | float | ≥ 0 |
