@@ -11,7 +11,7 @@ E2 is responsible for the data and intelligence layer of the Energy Management S
 - Kafka based data ingestion from E1 (smart meters via MQTT)
 - Real time stream processing with Apache Flink
 - Batch analytics pipelines with Apache Spark + Airflow
-- Load forecasting model (LSTM/Prophet)
+- Load forecasting model (LSTM)
 - Anomaly detection for energy theft/leakage (Isolation Forest)
 - Data quality validation with Great Expectations
 - REST API (FastAPI) serving forecasts, anomalies and recommendations to E3 & E4
@@ -49,6 +49,7 @@ data-intelligence/
 │       └── ci.yml                    # GitHub Actions CI pipeline
 ├── dags/                             # Airflow DAGs (batch pipelines)
 │   ├── data-validation-dag.py
+│   ├── db-retention-dag.py
 │   ├── energy-batch-pipeline.py
 │   └── model-retraining-dag.py
 ├── data/                             # Local sample/mock data
@@ -56,10 +57,13 @@ data-intelligence/
 │   ├── postgres/                     # Schema + migrations
 │   └── influxdb/                     # Bucket configs
 ├── docker/                           # Per-service Dockerfiles
+│   ├── Dockerfile.airflow
 │   ├── Dockerfile.anomaly
 │   ├── Dockerfile.api
+│   ├── Dockerfile.batch-pipeline
 │   ├── Dockerfile.forecasting
 │   ├── Dockerfile.ingestion
+│   ├── Dockerfile.storage
 │   └── Dockerfile.streaming
 ├── mlflow/                           # MLflow experiment tracking config
 │   └── config.yaml
@@ -81,6 +85,10 @@ data-intelligence/
 │   │   └── dependencies.py
 │   ├── validation/                   # Great Expectations
 │   └── utils/
+├── docs/                             # Integration guides + API contracts
+│   ├── integration-e1.md
+│   ├── integration-e3.md
+│   └── integration-e4.md
 ├── tests/
 │   ├── fixtures/
 │   │   └── energy-readings.json
@@ -92,9 +100,13 @@ data-intelligence/
 │   │   └── test-api-e2e.py
 │   └── unit/
 │       ├── test-anomaly.py
+│       ├── test-anomaly-pipeline.py
 │       ├── test-api.py
 │       ├── test-forecasting.py
 │       ├── test-ingestion.py
+│       ├── test-postgres-validator.py
+│       ├── test-recommendations.py
+│       ├── test-schemas.py
 │       ├── test-streaming.py
 │       └── test-validation.py
 ├── .env.example
