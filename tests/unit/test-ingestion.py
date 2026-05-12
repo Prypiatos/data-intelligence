@@ -68,17 +68,31 @@ def test_invalid_voltage_rejected():
     assert "voltage" in message
 
 
-def test_current_zero_rejected():
+def test_current_zero_accepted():
     data = valid_telemetry()
     data["current"] = 0
+    is_valid, _ = validate_telemetry(data)
+    assert is_valid is True
+
+
+def test_current_negative_rejected():
+    data = valid_telemetry()
+    data["current"] = -1
     is_valid, message = validate_telemetry(data)
     assert is_valid is False
     assert "current" in message
 
 
-def test_power_zero_rejected():
+def test_power_zero_accepted():
     data = valid_telemetry()
     data["power"] = 0
+    is_valid, _ = validate_telemetry(data)
+    assert is_valid is True
+
+
+def test_power_negative_rejected():
+    data = valid_telemetry()
+    data["power"] = -1
     is_valid, message = validate_telemetry(data)
     assert is_valid is False
     assert "power" in message

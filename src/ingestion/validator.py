@@ -34,15 +34,15 @@ def validate_telemetry(data):
     if not isinstance(data["current"], (int, float)):
         return False, "current must be a number"
 
-    if data["current"] <= 0:
-        return False, "current must be greater than 0"
+    if data["current"] < 0:
+        return False, "current must be non-negative"
 
     # power must be numeric and greater than 0
     if not isinstance(data["power"], (int, float)):
         return False, "power must be a number"
 
-    if data["power"] <= 0:
-        return False, "power must be greater than 0"
+    if data["power"] < 0:
+        return False, "power must be non-negative"
 
     # energy_wh must be numeric and non-negative
     if not isinstance(data["energy_wh"], (int, float)):
