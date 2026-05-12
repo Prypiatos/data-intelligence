@@ -15,11 +15,14 @@ EPOCH_MS_TABLES = [
     "node_health",
     "anomaly_records",
     "stream_summaries",
+    "forecasts",
 ]
 
 # Tables with a created_at TIMESTAMP column
 CREATED_AT_TABLES = [
     "energy_features",
+    "energy_analytics_hourly",
+    "energy_analytics_daily",
 ]
 
 
