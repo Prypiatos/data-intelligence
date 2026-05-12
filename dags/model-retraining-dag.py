@@ -65,7 +65,7 @@ def fetch_training_data(**context):
         f"""
         SELECT *
         FROM energy_features
-        WHERE timestamp >= NOW() - INTERVAL '{LOOKBACK_DAYS} days'
+        WHERE timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL '{LOOKBACK_DAYS} days') * 1000
         ORDER BY node_id, timestamp
         """,
         engine,
@@ -76,7 +76,7 @@ def fetch_training_data(**context):
         f"""
         SELECT node_id, timestamp, voltage, current, power, energy_wh
         FROM telemetry_readings
-        WHERE timestamp >= NOW() - INTERVAL '{LOOKBACK_DAYS} days'
+        WHERE timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL '{LOOKBACK_DAYS} days') * 1000
         ORDER BY timestamp
         """,
         engine,
@@ -110,24 +110,23 @@ def retrain_lstm_model(**context):
     import mlflow.pytorch
     import pandas as pd
     from pathlib import Path
-    from sklearn.preprocessing import MinMaxScaler
 
-    from src.models.forecasting.lstm_model import LSTMForecaster
+    from src.models.forecasting.lstm_model import train_from_df, SEQ_LEN, PRED_LEN
 
     ti = context["task_instance"]
     features_path = ti.xcom_pull(task_ids="fetch_training_data", key="features_path")
 
-    df = pd.read_csv(features_path)
-    # Use per-node hourly power sequences ordered by node + timestamp
-    df = df.sort_values(["node_id", "timestamp"])
-    data = df[["avg_power"]].values
+    df = pd.read_csv(features_path).sort_values(["node_id", "timestamp"])
 
-    scaler = MinMaxScaler()
-    scaled = scaler.fit_transform(data)
+    # Per-node time-based split — last TEST_SPLIT fraction of each node held out
+    train_parts, test_parts = [], []
+    for _, grp in df.groupby("node_id"):
+        split = int(len(grp) * (1 - TEST_SPLIT))
+        train_parts.append(grp.iloc[:split])
+        test_parts.append(grp.iloc[split:])
 
-    train_size = int(len(scaled) * (1 - TEST_SPLIT))
-    train_data = scaled[:train_size]
-    test_data = scaled[train_size:]
+    df_train = pd.concat(train_parts).rename(columns={"avg_power": "power_w"})
+    df_test = pd.concat(test_parts)
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_FORECASTING_EXPERIMENT)
@@ -137,65 +136,43 @@ def retrain_lstm_model(**context):
         mlflow.log_params({
             "model_type": "LSTM",
             "epochs": 50,
-            "batch_size": 32,
-            "learning_rate": 0.001,
             "seq_len": SEQ_LEN,
             "pred_len": PRED_LEN,
             "lookback_days": LOOKBACK_DAYS,
-            "training_samples": len(train_data),
+            "training_rows": len(df_train),
         })
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = LSTMForecaster().to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        loss_fn = torch.nn.MSELoss()
+        model, scaler = train_from_df(df_train, epochs=50)
 
-        for epoch in range(50):
-            model.train()
-            epoch_loss = 0.0
-            n_batches = 0
-            batch_X, batch_y = [], []
-            for i in range(0, len(train_data) - SEQ_LEN - PRED_LEN, STEP):
-                batch_X.append(train_data[i : i + SEQ_LEN])
-                batch_y.append(train_data[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN, 0])
-                if len(batch_X) == 32 or i == len(train_data) - SEQ_LEN - PRED_LEN - 1:
-                    X = torch.FloatTensor(np.array(batch_X)).to(device)
-                    y = torch.FloatTensor(np.array(batch_y)).to(device)
-                    pred = model(X)
-                    loss = loss_fn(pred, y)
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    epoch_loss += loss.item()
-                    n_batches += 1
-                    batch_X, batch_y = [], []
-
-            avg_loss = epoch_loss / max(n_batches, 1)
-            if (epoch + 1) % 10 == 0:
-                logger.info(f"Epoch {epoch + 1}/50 - Loss: {avg_loss:.4f}")
-                mlflow.log_metric("train_loss", avg_loss, step=epoch)
-
-        # Evaluate on test set
+        # Evaluate on held-out test data, respecting node boundaries
         model.eval()
-        test_preds, test_truths = [], []
-        with torch.no_grad():
-            for i in range(len(test_data) - SEQ_LEN - PRED_LEN):
-                X = torch.FloatTensor(test_data[i : i + SEQ_LEN]).unsqueeze(0).to(device)
-                pred = model(X).cpu().numpy().flatten()
-                truth = test_data[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN, 0]
-                test_preds.append(pred)
-                test_truths.append(truth)
+        device = next(model.parameters()).device
+        all_preds, all_truths = [], []
+        for _, grp in df_test.groupby("node_id"):
+            vals = grp["avg_power"].values.astype(np.float32)
+            if len(vals) < SEQ_LEN + PRED_LEN:
+                continue
+            for i in range(0, len(vals) - SEQ_LEN - PRED_LEN + 1, STEP):
+                x_norm = scaler.transform(vals[i : i + SEQ_LEN].reshape(-1, 1)).flatten()
+                y_norm = scaler.transform(vals[i + SEQ_LEN : i + SEQ_LEN + PRED_LEN].reshape(-1, 1)).flatten()
+                X = torch.FloatTensor(x_norm).unsqueeze(0).unsqueeze(-1).to(device)
+                with torch.no_grad():
+                    pred = model(X).cpu().numpy().flatten()
+                all_preds.append(pred)
+                all_truths.append(y_norm)
 
-        test_preds = np.array(test_preds)
-        test_truths = np.array(test_truths)
-        rmse = float(np.sqrt(np.mean((test_preds - test_truths) ** 2)))
-        mape = float(np.mean(np.abs((test_truths - test_preds) / (test_truths + 1e-8))))
+        if all_preds:
+            preds = np.array(all_preds)
+            truths = np.array(all_truths)
+            rmse = float(np.sqrt(np.mean((preds - truths) ** 2)))
+            mape = float(np.mean(np.abs((truths - preds) / (np.abs(truths) + 1e-8))))
+        else:
+            rmse, mape = 0.0, 0.0
 
         mlflow.log_metrics({"test_rmse": rmse, "test_mape": mape})
         mlflow.pytorch.log_model(model, "lstm_model")
         logger.info(f"LSTM — RMSE: {rmse:.4f}, MAPE: {mape:.4f}")
 
-        # Save model and scaler to disk so batch_pipeline picks them up
         Path(MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
         torch.save(model, MODEL_PATH)
         with open(SCALER_PATH, "wb") as f:
