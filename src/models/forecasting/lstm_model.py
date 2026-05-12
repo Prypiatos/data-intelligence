@@ -17,6 +17,7 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
@@ -33,6 +34,8 @@ STEP = 2  # stride when creating sequences
 
 MODEL_OUT = Path("models/lstm_model.pth")
 SCALER_OUT = Path("models/lstm_scaler.pkl")
+
+DATA_SOURCE = os.getenv("DATA_SOURCE", "recon_sl")
 
 
 class LSTMForecaster(nn.Module):
@@ -57,21 +60,67 @@ def _build_sequences(power: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
+def _generate_bulb_hourly(
+    rated_watts: float = 60.0,
+    n_days: int = 365,
+    n_bulbs: int = 10,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Generate synthetic hourly avg_power data for incandescent bulbs.
+
+    Usage pattern: ON evenings (18–22h, 85% chance) and mornings (7–8h, 60%),
+    OFF otherwise (5% chance). Power when on: rated_watts * (V/230)^2 with
+    small voltage noise, simulating a real incandescent load.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    base = pd.Timestamp("2025-01-01", tz="UTC")
+
+    for bulb_idx in range(n_bulbs):
+        node_id = f"bulb-synth-{bulb_idx:02d}"
+        for day in range(n_days):
+            for hour in range(24):
+                if 18 <= hour <= 22:
+                    on_prob = 0.85
+                elif hour in (7, 8):
+                    on_prob = 0.60
+                else:
+                    on_prob = 0.05
+
+                if rng.random() < on_prob:
+                    voltage = 230.0 + rng.normal(0, 2.0)
+                    power = float(rated_watts * (voltage / 230.0) ** 2)
+                else:
+                    power = 0.0
+
+                rows.append({"node_id": node_id, "power_w": power})
+
+    return pd.DataFrame(rows)
+
+
 if __name__ == "__main__":
-    from src.models.recon_sl_loader import load_recon_sl
+    if DATA_SOURCE == "bulb":
+        print("Generating synthetic bulb hourly data ...")
+        hourly = _generate_bulb_hourly()
+        mlflow_dataset = "bulb-synthetic"
+        mlflow_experiment = "lstm-forecasting-bulb"
+    else:
+        from src.models.recon_sl_loader import load_recon_sl
 
-    print("Loading RECON-SL dataset ...")
-    df = load_recon_sl(max_households=MAX_HOUSEHOLDS)
+        print("Loading RECON-SL dataset ...")
+        df = load_recon_sl(max_households=MAX_HOUSEHOLDS)
 
-    print("Resampling to hourly per household ...")
-    hourly = (
-        df.set_index("datetime")
-        .groupby("node_id")["power_w"]
-        .resample("1h")
-        .mean()
-        .reset_index()
-        .dropna(subset=["power_w"])
-    )
+        print("Resampling to hourly per household ...")
+        hourly = (
+            df.set_index("datetime")
+            .groupby("node_id")["power_w"]
+            .resample("1h")
+            .mean()
+            .reset_index()
+            .dropna(subset=["power_w"])
+        )
+        mlflow_dataset = "RECON-SL"
+        mlflow_experiment = "lstm-forecasting-recon-sl"
 
     print("Building sequences ...")
     all_X, all_y = [], []
@@ -111,16 +160,15 @@ if __name__ == "__main__":
     n = len(X_t)
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))
-    mlflow.set_experiment("lstm-forecasting-recon-sl")
+    mlflow.set_experiment(mlflow_experiment)
 
     with mlflow.start_run():
         mlflow.log_params({
-            "dataset": "RECON-SL",
+            "dataset": mlflow_dataset,
             "epochs": EPOCHS,
             "batch_size": BATCH_SIZE,
             "seq_len": SEQ_LEN,
             "pred_len": PRED_LEN,
-            "max_households": MAX_HOUSEHOLDS,
             "n_sequences": n,
         })
 
