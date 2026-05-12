@@ -213,6 +213,8 @@ Returns stored 24-hour load forecasts. Use this to display forecast charts per n
 
 Returns an empty array `[]` if no forecasts have been generated yet.
 
+> **Note:** Forecasts are not generated while a node is in learning mode (`learning_mode: true`). Use `GET /nodes` to check — if `days_remaining > 0`, show the same "Learning mode — X days remaining" message instead of an empty chart.
+
 ---
 
 ### GET /telemetry/history
@@ -419,8 +421,8 @@ Call `GET /nodes` to get all active nodes and their status. This is the correct 
 
 **Recommended dashboard flow:**
 1. On page load call `GET /nodes`
-2. For each node: if `learning_mode: true` → show "Learning mode — X days remaining"
-3. For each node: if `learning_mode: false` → show anomaly panel, poll `/anomalies?node_id=...`
+2. For each node: if `learning_mode: true` → show "Learning mode — X days remaining" for **both** the anomaly panel and the forecast chart
+3. For each node: if `learning_mode: false` → show anomaly panel (poll `/anomalies?node_id=...`) and forecast chart (poll `/forecast/forecasts?node_id=...`)
 
 ---
 
