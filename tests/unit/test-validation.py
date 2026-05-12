@@ -82,16 +82,32 @@ def test_voltage_above_allowed_range_fails_validation():
     assert_invalid(data, "voltage")
 
 
-def test_zero_current_fails_validation():
+def test_zero_current_passes_validation():
     data = valid_telemetry()
     data["current"] = 0
+
+    is_valid, _ = validate_telemetry(data)
+    assert is_valid is True
+
+
+def test_zero_power_passes_validation():
+    data = valid_telemetry()
+    data["power"] = 0
+
+    is_valid, _ = validate_telemetry(data)
+    assert is_valid is True
+
+
+def test_negative_current_fails_validation():
+    data = valid_telemetry()
+    data["current"] = -1
 
     assert_invalid(data, "current")
 
 
-def test_zero_power_fails_validation():
+def test_negative_power_fails_validation():
     data = valid_telemetry()
-    data["power"] = 0
+    data["power"] = -1
 
     assert_invalid(data, "power")
 
