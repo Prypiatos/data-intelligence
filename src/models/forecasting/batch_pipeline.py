@@ -31,6 +31,7 @@ MODEL_PATH = os.getenv("MODEL_PATH", "models/lstm_model.pth")
 SCALER_PATH = os.getenv("SCALER_PATH", "models/lstm_scaler.pkl")
 FORECAST_HORIZON = 24
 SEQ_LEN = 10
+FORECAST_COLD_START_DAYS = int(os.getenv("FORECAST_COLD_START_DAYS", "7"))
 
 
 class LSTMForecastingModel:
@@ -57,6 +58,42 @@ class LSTMForecastingModel:
             output.cpu().numpy()[0].reshape(-1, 1)
         ).flatten()
         return np.maximum(forecast, 0)
+
+
+def _try_cold_start(engine) -> bool:
+    """Train LSTM from energy_features when FORECAST_COLD_START_DAYS of data exists.
+    Saves model and scaler to disk. Returns True if training succeeded.
+    """
+    from src.models.forecasting.lstm_model import SEQ_LEN as _SEQ, PRED_LEN as _PRED, train_from_df
+
+    df = pd.read_sql(
+        "SELECT node_id, timestamp, avg_power FROM energy_features WHERE avg_power IS NOT NULL ORDER BY node_id, timestamp",
+        engine,
+    )
+    if df.empty:
+        logger.info("Cold start: no energy_features data yet")
+        return False
+
+    span_days = (df["timestamp"].max() - df["timestamp"].min()) / (24 * 3600 * 1000)
+    if span_days < FORECAST_COLD_START_DAYS:
+        logger.info("Cold start: need %d days, have %.1f — waiting", FORECAST_COLD_START_DAYS, span_days)
+        return False
+
+    min_rows = _SEQ + _PRED
+    if (df.groupby("node_id").size() >= min_rows).sum() == 0:
+        logger.info("Cold start: no node has %d hourly rows yet", min_rows)
+        return False
+
+    logger.info("Cold start: training LSTM on %.1f days of real data (%d rows)", span_days, len(df))
+    df_train = df.rename(columns={"avg_power": "power_w"})
+    model, scaler = train_from_df(df_train)
+
+    Path(MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model, MODEL_PATH)
+    with open(SCALER_PATH, "wb") as f:
+        pickle.dump(scaler, f)
+    logger.info("Cold start complete — model saved to %s", MODEL_PATH)
+    return True
 
 
 def get_postgres_connection():
@@ -140,6 +177,13 @@ def run_batch_pipeline() -> bool:
     logger.info("=" * 60)
 
     try:
+        if not Path(MODEL_PATH).exists() or not Path(SCALER_PATH).exists():
+            logger.info("Model not found — attempting cold-start training ...")
+            cold_engine = get_postgres_connection()
+            if not _try_cold_start(cold_engine):
+                logger.info("Not enough data for cold-start yet — skipping this run")
+                return False
+
         logger.info("Step 1: Loading trained LSTM model and scaler ...")
         model = LSTMForecastingModel(MODEL_PATH, SCALER_PATH)
 

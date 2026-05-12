@@ -36,6 +36,9 @@ _graduated_nodes: set = set()
 # Cache: node_id -> (check_time, is_learning_mode) — stores the actual result, not just the timestamp
 _learning_mode_cache: dict = {}
 
+_last_cold_start_attempt: float = 0.0
+_COLD_START_RETRY_INTERVAL = 3600.0  # retry training once per hour until ready
+
 
 def _is_learning_mode(conn, node_id: str) -> bool:
     """Return True if the node has less than LEARNING_PERIOD_DAYS of data."""
@@ -66,6 +69,38 @@ def _is_learning_mode(conn, node_id: str) -> bool:
 
     _learning_mode_cache[node_id] = (now, True)
     return True
+
+
+def _try_cold_start_anomaly(conn):
+    """Train IsolationForest on telemetry_readings when LEARNING_PERIOD_DAYS of data exists.
+    Returns a fitted AnomalyDetector saved to MODEL_PATH, or None if not ready yet.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT MIN(timestamp), MAX(timestamp), COUNT(*) FROM telemetry_readings")
+        row = cur.fetchone()
+
+    if not row or row[0] is None or row[2] < 100:
+        logger.info("Cold start: insufficient data (count=%s)", row[2] if row else 0)
+        return None
+
+    span_days = (row[1] - row[0]) / (24 * 3600 * 1000)
+    if span_days < LEARNING_PERIOD_DAYS:
+        logger.info("Cold start: need %d days, have %.1f — waiting", LEARNING_PERIOD_DAYS, span_days)
+        return None
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT node_id, timestamp, power FROM telemetry_readings ORDER BY timestamp LIMIT 200000"
+        )
+        rows = cur.fetchall()
+
+    readings = [{"node_id": r[0], "timestamp": r[1], "power": r[2]} for r in rows]
+    contamination = float(os.getenv("ANOMALY_CONTAMINATION", "0.01"))
+    detector = AnomalyDetector(contamination=contamination, n_estimators=100)
+    detector.fit(readings)
+    detector.save(MODEL_PATH)
+    logger.info("Cold start: anomaly model trained on %d readings, saved to %s", len(readings), MODEL_PATH)
+    return detector
 
 
 def _build_consumer() -> KafkaConsumer:
@@ -104,24 +139,27 @@ def _write_to_postgres(conn, result: dict) -> None:
 
 
 def run() -> None:
+    global _last_cold_start_attempt
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    if not (MODEL_PATH / "detector.pkl").exists():
-        logger.error(
-            "Model not found at %s. Run `python -m src.models.anomaly.trainer` first.",
-            MODEL_PATH,
-        )
-        sys.exit(1)
-
-    detector = AnomalyDetector.load(MODEL_PATH)
-    logger.info("Loaded anomaly detector from %s", MODEL_PATH)
-
     consumer = _build_consumer()
     producer = _build_producer()
     conn = psycopg2.connect(POSTGRES_DSN)
+
+    if (MODEL_PATH / "detector.pkl").exists():
+        detector = AnomalyDetector.load(MODEL_PATH)
+        logger.info("Loaded anomaly detector from %s", MODEL_PATH)
+    else:
+        logger.info(
+            "No model at %s — collecting data for %d days before training",
+            MODEL_PATH, LEARNING_PERIOD_DAYS,
+        )
+        detector = None
+
     logger.info("Pipeline started — consuming from %s", INPUT_TOPIC)
 
     def _shutdown(sig, frame):
@@ -142,6 +180,16 @@ def run() -> None:
             if _is_learning_mode(conn, node_id):
                 logger.debug("Node %s in learning mode — skipping anomaly detection", node_id)
                 continue
+
+            if detector is None:
+                now = time.time()
+                if now - _last_cold_start_attempt >= _COLD_START_RETRY_INTERVAL:
+                    _last_cold_start_attempt = now
+                    detector = _try_cold_start_anomaly(conn)
+                    if detector is None:
+                        logger.info("Cold start not ready yet — still collecting data")
+                if detector is None:
+                    continue
 
             results = detector.predict([reading])
             result = results[0]

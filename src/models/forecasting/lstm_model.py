@@ -1,16 +1,15 @@
 """LSTM forecasting model for 24-hour energy consumption prediction.
 
-Training uses the RECON-SL Sri Lankan smart meter dataset.
-Set RECON_SL_DIR env var if the data is not in the default location.
-
 Usage:
-    python -m src.models.forecasting.lstm_model
+    python -m src.models.forecasting.lstm_model            # RECON-SL dataset
+    DATA_SOURCE=bulb python -m src.models.forecasting.lstm_model
 
 Outputs:
-    models/lstm_model.pth   — trained model object
+    models/lstm_model.pth   — trained model weights
     models/lstm_scaler.pkl  — fitted MinMaxScaler (used by batch_pipeline)
 """
 
+import logging
 import os
 import pickle
 from pathlib import Path
@@ -21,6 +20,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
+
+logger = logging.getLogger(__name__)
 
 SEQ_LEN = 10
 PRED_LEN = 24
@@ -60,21 +61,86 @@ def _build_sequences(power: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
+def train_from_df(
+    hourly_df: pd.DataFrame,
+    epochs: int = EPOCHS,
+    batch_size: int = BATCH_SIZE,
+    lr: float = LR,
+) -> tuple[LSTMForecaster, MinMaxScaler]:
+    """Train an LSTMForecaster from a DataFrame with columns node_id, power_w.
+
+    Returns (model, scaler) without saving to disk — caller decides where to save.
+    Raises ValueError if there is not enough data to build any training sequence.
+    """
+    all_X, all_y = [], []
+    for _, grp in hourly_df.groupby("node_id"):
+        vals = grp["power_w"].values.astype(np.float32)
+        if len(vals) < SEQ_LEN + PRED_LEN:
+            continue
+        X, y = _build_sequences(vals)
+        all_X.append(X)
+        all_y.append(y)
+
+    if not all_X:
+        raise ValueError(
+            f"No node has enough hourly rows to build sequences "
+            f"(need at least {SEQ_LEN + PRED_LEN})"
+        )
+
+    X_all = np.concatenate(all_X)
+    y_all = np.concatenate(all_y)
+    logger.info("Training on %d sequences from %d nodes", len(X_all), hourly_df["node_id"].nunique())
+
+    scaler = MinMaxScaler()
+    scaler.fit(np.concatenate([X_all.flatten(), y_all.flatten()]).reshape(-1, 1))
+    X_norm = scaler.transform(X_all.reshape(-1, 1)).reshape(X_all.shape)
+    y_norm = scaler.transform(y_all.reshape(-1, 1)).reshape(y_all.shape)
+
+    rng = np.random.default_rng(42)
+    idx = rng.permutation(len(X_norm))
+    X_norm, y_norm = X_norm[idx], y_norm[idx]
+
+    X_t = torch.FloatTensor(X_norm).unsqueeze(-1)  # (N, seq_len, 1)
+    y_t = torch.FloatTensor(y_norm)                # (N, 24)
+    n = len(X_t)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = LSTMForecaster().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.MSELoss()
+
+    for epoch in range(epochs):
+        model.train()
+        epoch_loss = 0.0
+        for i in range(0, n, batch_size):
+            xb = X_t[i : i + batch_size].to(device)
+            yb = y_t[i : i + batch_size].to(device)
+            pred = model(xb)
+            loss = loss_fn(pred, yb)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item() * len(xb)
+        avg_loss = epoch_loss / n
+        logger.info("Epoch %02d/%d  loss=%.6f", epoch + 1, epochs, avg_loss)
+
+    return model, scaler
+
+
 def _generate_bulb_hourly(
     rated_watts: float = 60.0,
     n_days: int = 365,
     n_bulbs: int = 10,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Generate synthetic hourly avg_power data for incandescent bulbs.
+    """Generate synthetic hourly power data for incandescent bulbs.
 
     Usage pattern: ON evenings (18–22h, 85% chance) and mornings (7–8h, 60%),
-    OFF otherwise (5% chance). Power when on: rated_watts * (V/230)^2 with
-    small voltage noise, simulating a real incandescent load.
+    OFF otherwise (5%). Power when on: rated_watts * (V/230)^2 with small
+    voltage noise.
     """
     rng = np.random.default_rng(seed)
     rows = []
-    base = pd.Timestamp("2025-01-01", tz="UTC")
 
     for bulb_idx in range(n_bulbs):
         node_id = f"bulb-synth-{bulb_idx:02d}"
@@ -99,6 +165,8 @@ def _generate_bulb_hourly(
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
     if DATA_SOURCE == "bulb":
         print("Generating synthetic bulb hourly data ...")
         hourly = _generate_bulb_hourly()
@@ -122,43 +190,6 @@ if __name__ == "__main__":
         mlflow_dataset = "RECON-SL"
         mlflow_experiment = "lstm-forecasting-recon-sl"
 
-    print("Building sequences ...")
-    all_X, all_y = [], []
-    for _, grp in hourly.groupby("node_id"):
-        vals = grp["power_w"].values
-        if len(vals) < SEQ_LEN + PRED_LEN:
-            continue
-        X, y = _build_sequences(vals)
-        all_X.append(X)
-        all_y.append(y)
-
-    X_all = np.concatenate(all_X)
-    y_all = np.concatenate(all_y)
-    print(f"Total sequences: {len(X_all):,}")
-
-    # Fit scaler on all power values seen during training
-    scaler = MinMaxScaler()
-    scaler.fit(np.concatenate([X_all.flatten(), y_all.flatten()]).reshape(-1, 1))
-
-    X_norm = scaler.transform(X_all.reshape(-1, 1)).reshape(X_all.shape)
-    y_norm = scaler.transform(y_all.reshape(-1, 1)).reshape(y_all.shape)
-
-    # Shuffle
-    rng = np.random.default_rng(42)
-    idx = rng.permutation(len(X_norm))
-    X_norm, y_norm = X_norm[idx], y_norm[idx]
-
-    X_t = torch.FloatTensor(X_norm).unsqueeze(-1)  # (N, seq_len, 1)
-    y_t = torch.FloatTensor(y_norm)                # (N, 24)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training on {device} ...")
-
-    model = LSTMForecaster().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    loss_fn = nn.MSELoss()
-    n = len(X_t)
-
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "mlruns"))
     mlflow.set_experiment(mlflow_experiment)
 
@@ -169,24 +200,14 @@ if __name__ == "__main__":
             "batch_size": BATCH_SIZE,
             "seq_len": SEQ_LEN,
             "pred_len": PRED_LEN,
-            "n_sequences": n,
         })
 
-        for epoch in range(EPOCHS):
-            model.train()
-            epoch_loss = 0.0
-            for i in range(0, n, BATCH_SIZE):
-                xb = X_t[i : i + BATCH_SIZE].to(device)
-                yb = y_t[i : i + BATCH_SIZE].to(device)
-                pred = model(xb)
-                loss = loss_fn(pred, yb)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                epoch_loss += loss.item() * len(xb)
-            avg_loss = epoch_loss / n
-            print(f"  Epoch {epoch + 1:02d}/{EPOCHS}  loss={avg_loss:.6f}")
-            mlflow.log_metric("train_loss", avg_loss, step=epoch)
+        model, scaler = train_from_df(hourly)
+
+        mlflow.log_metric("n_sequences", sum(
+            max(0, len(grp) - SEQ_LEN - PRED_LEN + 1)
+            for _, grp in hourly.groupby("node_id")
+        ))
 
     MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model, str(MODEL_OUT))
