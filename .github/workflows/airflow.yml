@@ -24,7 +24,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/platform-infra
           path: platform-infra
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PLATFORM_INFRA_PAT }}
 
       - name: Set up Docker Buildx
         # Install Buildx, the extended Docker build client that supports advanced features like caching

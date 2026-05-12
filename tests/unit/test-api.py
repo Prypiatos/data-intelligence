@@ -1,6 +1,6 @@
 """Unit tests for all FastAPI endpoints."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
