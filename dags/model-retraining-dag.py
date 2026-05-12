@@ -37,7 +37,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MLFLOW_FORECASTING_EXPERIMENT = "load-forecasting"
 MLFLOW_ANOMALY_EXPERIMENT = "anomaly-detection"
 
-LOOKBACK_DAYS = 90
+LOOKBACK_DAYS = 30
 TEST_SPLIT = 0.2
 SEQ_LEN = 10   # must match lstm_model.py SEQ_LEN
 PRED_LEN = 24
