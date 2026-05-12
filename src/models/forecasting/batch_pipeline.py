@@ -31,7 +31,7 @@ MODEL_PATH = os.getenv("MODEL_PATH", "models/lstm_model.pth")
 SCALER_PATH = os.getenv("SCALER_PATH", "models/lstm_scaler.pkl")
 FORECAST_HORIZON = 24
 SEQ_LEN = 10
-FORECAST_COLD_START_DAYS = int(os.getenv("FORECAST_COLD_START_DAYS", "7"))
+FORECAST_COLD_START_DAYS = int(os.getenv("FORECAST_COLD_START_DAYS", "30"))
 
 
 class LSTMForecastingModel:
