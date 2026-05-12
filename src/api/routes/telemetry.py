@@ -42,7 +42,7 @@ def get_telemetry_history(
     if node_id and not _NODE_ID_RE.match(node_id):
         raise HTTPException(status_code=400, detail="Invalid node_id format")
 
-    start_str = _ms_to_rfc3339(start) if start is not None else "-90d"
+    start_str = _ms_to_rfc3339(start) if start is not None else "-30d"
     stop_str = _ms_to_rfc3339(end) if end is not None else "now()"
     node_filter = f'|> filter(fn: (r) => r.node_id == "{node_id}")' if node_id else ""
 
