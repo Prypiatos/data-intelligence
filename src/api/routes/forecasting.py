@@ -35,7 +35,7 @@ def get_forecasts(
         SELECT node_id, timestamp, predicted_consumption
         FROM forecasts
         {where}
-        ORDER BY timestamp DESC
+        ORDER BY timestamp ASC
         LIMIT :limit
     """)
 
