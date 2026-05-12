@@ -153,14 +153,14 @@ ANOMALY_ROWS = [
     {
         "node_id": "node_001",
         "timestamp": 1714500000000,
-        "anomaly_type": "theft_or_leakage",
+        "anomaly_type": "consumption_anomaly",
         "score": 0.12,
         "severity": "high",
     },
     {
         "node_id": "node_002",
         "timestamp": 1714496400000,
-        "anomaly_type": "theft_or_leakage",
+        "anomaly_type": "consumption_anomaly",
         "score": 0.35,
         "severity": "medium",
     },

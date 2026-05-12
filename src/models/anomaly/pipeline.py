@@ -17,7 +17,7 @@ INPUT_TOPIC = "energy.telemetry"
 OUTPUT_TOPIC = "energy.anomalies"
 GROUP_ID = "anomaly-detection-group"
 MODEL_PATH = Path(os.getenv("ANOMALY_MODEL_PATH", "models/anomaly"))
-ANOMALY_TYPE = "theft_or_leakage"
+ANOMALY_TYPE = "consumption_anomaly"
 
 POSTGRES_DSN = (
     f"host={os.getenv('POSTGRES_HOST', 'localhost')} "

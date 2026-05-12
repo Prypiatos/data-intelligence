@@ -61,11 +61,11 @@ class TestWriteToPostgres:
         _write_to_postgres(conn, self._result())
         conn.commit.assert_called_once()
 
-    def test_anomaly_type_is_theft_or_leakage(self):
+    def test_anomaly_type_is_consumption_anomaly(self):
         conn, cur = _make_conn()
         _write_to_postgres(conn, self._result())
         args = cur.execute.call_args.args[1]
-        assert args[2] == "theft_or_leakage"
+        assert args[2] == "consumption_anomaly"
 
     def test_high_severity_written(self):
         conn, cur = _make_conn()
